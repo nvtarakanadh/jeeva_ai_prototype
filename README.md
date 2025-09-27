@@ -1,73 +1,125 @@
-# Welcome to your Lovable project
+# Jeeva.AI - Patient-Centric Health Management Platform
 
-## Project info
+A comprehensive health management platform that empowers patients with AI-driven health insights and consent-based data sharing.
 
-**URL**: https://lovable.dev/projects/de88eae8-6f13-48b7-8c69-955ace258e0f
+## 🏥 Features
 
-## How can I edit this code?
+- **Patient Dashboard**: Comprehensive health overview and record management
+- **Doctor Dashboard**: Professional tools for healthcare providers
+- **AI-Powered Analysis**: Intelligent health record analysis and insights
+- **Real-time Notifications**: Instant updates and alerts
+- **Consent Management**: Patient-controlled data sharing
+- **Health Records**: Secure storage and management of medical documents
+- **Authentication**: Secure user authentication and role-based access
 
-There are several ways of editing your application.
+## 🚀 Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **UI Framework**: shadcn/ui + Tailwind CSS
+- **Backend**: Supabase
+- **AI Integration**: Custom health analysis algorithms
+- **State Management**: React Query + Context API
+- **Routing**: React Router DOM
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/de88eae8-6f13-48b7-8c69-955ace258e0f) and start prompting.
+## 🛠️ Development Setup
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or yarn
+- Git
 
-**Use your preferred IDE**
+### Installation
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/nvtarakanadh/jeeva_ai_prototype.git
+   cd jeeva_ai_prototype
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Follow these steps:
+3. **Start development server**
+   ```bash
+   npm run dev
+   ```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+4. **Open your browser**
+   Navigate to `http://localhost:8081` (or the port shown in terminal)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🌐 Deployment
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Vercel (Recommended)
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. **Connect to Vercel**
+   - Visit [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Deploy automatically
+
+2. **Environment Variables**
+   Set these in Vercel dashboard:
+   - `VITE_SUPABASE_URL`: Your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key
+
+### Other Platforms
+- **Netlify**: Connect GitHub repo and deploy
+- **GitHub Pages**: Use GitHub Actions for deployment
+- **AWS Amplify**: Connect repository and configure build settings
+
+## 📱 Usage
+
+### For Patients
+1. **Register/Login** with your credentials
+2. **Upload Health Records** securely
+3. **Get AI Insights** on your health data
+4. **Manage Consent** for data sharing
+5. **Track Health Trends** over time
+
+### For Doctors
+1. **Professional Login** with credentials
+2. **Access Patient Records** (with consent)
+3. **Provide Medical Insights** and recommendations
+4. **Manage Patient Care** efficiently
+
+## 🔧 Configuration
+
+### Supabase Setup
+1. Create a new Supabase project
+2. Set up the database schema
+3. Configure authentication
+4. Add environment variables
+
+### Environment Variables
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-**Edit a file directly in GitHub**
+## 📄 License
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-**Use GitHub Codespaces**
+## 🤝 Contributing
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## What technologies are used for this project?
+## 📞 Support
 
-This project is built with:
+For support, email support@jeeva.ai or create an issue in this repository.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🔗 Links
 
-## How can I deploy this project?
+- **Live Demo**: [Deployed on Vercel]
+- **Documentation**: [Coming Soon]
+- **API Docs**: [Coming Soon]
 
-Simply open [Lovable](https://lovable.dev/projects/de88eae8-6f13-48b7-8c69-955ace258e0f) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Built with ❤️ for better healthcare**
