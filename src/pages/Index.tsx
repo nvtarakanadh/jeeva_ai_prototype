@@ -97,6 +97,12 @@ const Index = () => {
                 <Button 
                   variant="outline" 
                   size="lg"
+                  onClick={() => {
+                    const featuresSection = document.querySelector('.grid');
+                    if (featuresSection) {
+                      featuresSection.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
                   className="text-lg px-8 py-3"
                 >
                   Learn More
