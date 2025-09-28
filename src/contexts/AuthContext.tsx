@@ -24,6 +24,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
+
   useEffect(() => {
     console.log('🔧 AuthContext: useEffect started');
     
@@ -35,27 +36,70 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         if (session?.user) {
           setSession(session);
-          // Create basic user data from session
-          const basicUserData = {
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || '',
-            phone: '',
-            role: (session.user.user_metadata?.role as UserRole) || 'patient',
-            dateOfBirth: undefined,
-            gender: undefined,
-            bloodGroup: undefined,
-            allergies: [],
-            emergencyContact: undefined,
-            specialization: undefined,
-            licenseNumber: undefined,
-            hospitalAffiliation: undefined,
-            createdAt: new Date(session.user.created_at),
-            updatedAt: new Date(session.user.updated_at),
-          } as any;
           
-          console.log('🔧 AuthContext: Setting initial user data', basicUserData);
-          setUser(basicUserData);
+          // Load user profile from database
+          const loadUserProfile = async () => {
+            try {
+              const { data: profile, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('user_id', session.user.id)
+                .single();
+
+              if (error) {
+                console.error('Error loading profile:', error);
+                // Fallback to session metadata
+                const userData = {
+                  id: session.user.id,
+                  name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+                  email: session.user.email || '',
+                  phone: '',
+                  role: (session.user.user_metadata?.role as UserRole) || 'patient',
+                  dateOfBirth: undefined,
+                  gender: undefined,
+                  bloodGroup: undefined,
+                  allergies: [],
+                  emergencyContact: undefined,
+                  specialization: undefined,
+                  licenseNumber: undefined,
+                  hospitalAffiliation: undefined,
+                  createdAt: new Date(session.user.created_at),
+                  updatedAt: new Date(session.user.updated_at),
+                } as any;
+                setUser(userData);
+              } else {
+                // Use profile data from database
+                const userData = {
+                  id: profile.user_id,
+                  name: profile.full_name,
+                  email: profile.email,
+                  phone: profile.phone || '',
+                  role: profile.role as UserRole,
+                  dateOfBirth: profile.date_of_birth ? new Date(profile.date_of_birth) : undefined,
+                  gender: profile.gender,
+                  bloodGroup: profile.blood_group,
+                  allergies: profile.allergies || [],
+                  emergencyContact: profile.emergency_contact_name ? {
+                    name: profile.emergency_contact_name,
+                    phone: profile.emergency_contact_phone,
+                    relationship: profile.emergency_contact_relationship
+                  } : undefined,
+                  specialization: profile.specialization,
+                  licenseNumber: profile.license_number,
+                  hospitalAffiliation: profile.hospital_affiliation,
+                  createdAt: new Date(profile.created_at),
+                  updatedAt: new Date(profile.updated_at),
+                } as any;
+                console.log('🔧 AuthContext: Setting user data from profile', userData);
+                setUser(userData);
+              }
+            } catch (error) {
+              console.error('Error in loadUserProfile:', error);
+              setUser(null);
+            }
+          };
+          
+          loadUserProfile();
         } else {
           setUser(null);
         }
@@ -77,8 +121,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         setSession(session);
         if (session?.user) {
-          // Create basic user data from session
-          const basicUserData = {
+          // Create basic user data from session metadata
+          const userData = {
             id: session.user.id,
             name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
             email: session.user.email || '',
@@ -96,8 +140,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             updatedAt: new Date(session.user.updated_at),
           } as any;
           
-          console.log('🔧 AuthContext: Setting user data from auth change', basicUserData);
-          setUser(basicUserData);
+          console.log('🔧 AuthContext: Setting user data during auth change', userData);
+          setUser(userData);
           
           // Force a re-render by updating loading state
           console.log('🔧 AuthContext: User data set, triggering re-render');
@@ -115,21 +159,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, password: string, role?: UserRole) => {
-    console.log('🔧 AuthContext: Login started for', email);
     try {
+      console.log('🔧 Attempting login for:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      console.log('🔧 AuthContext: Login response', { data, error });
+      console.log('🔧 Login response:', { data, error });
 
       if (error) {
-        console.error('🔧 AuthContext: Login error', error);
+        console.error('Login error:', error);
         throw error;
       }
 
-      console.log('🔧 AuthContext: Login successful');
+      if (data.user) {
+        console.log('🔧 User logged in:', data.user.id);
+        
+        // Load user profile from database
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('Profile error:', profileError);
+          // Create a basic profile if it doesn't exist
+          const { error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              user_id: data.user.id,
+              full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+              email: data.user.email,
+              role: data.user.user_metadata?.role || 'patient'
+            });
+          
+          if (insertError) {
+            console.error('Profile creation error:', insertError);
+          }
+        } else {
+          console.log('🔧 Profile loaded:', profile);
+        }
+      }
+
       toast({
         title: "Login successful",
         description: `Welcome back!`,
@@ -137,7 +211,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // The auth state change listener will handle setting the user data
     } catch (error: any) {
-      console.error('🔧 AuthContext: Login failed', error);
+      console.error('Login failed:', error);
       toast({
         title: "Login failed",
         description: error.message,
@@ -171,6 +245,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           .update({
             full_name: userData.name,
             phone: userData.phone,
+            role: userData.role || 'patient',
             date_of_birth: userData.dateOfBirth,
             gender: userData.gender,
             blood_group: userData.bloodGroup,

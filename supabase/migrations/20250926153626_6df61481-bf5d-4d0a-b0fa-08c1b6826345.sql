@@ -134,7 +134,8 @@ CREATE POLICY "System can create access logs" ON public.access_logs
 FOR INSERT WITH CHECK (true);
 
 -- Create storage buckets
-INSERT INTO storage.buckets (id, name, public) VALUES ('health-records', 'health-records', false);
+INSERT INTO storage.buckets (id, name, public) VALUES ('health-records', 'health-records', false)
+ON CONFLICT (id) DO NOTHING;
 
 -- Create storage policies
 CREATE POLICY "Users can upload their own health records" ON storage.objects

@@ -11,6 +11,7 @@ import { RecordType } from '@/types';
 import { UserPlus, Send, Search, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const AddPatient = () => {
   const navigate = useNavigate();
@@ -29,24 +30,7 @@ const AddPatient = () => {
 
   const availableDataTypes: RecordType[] = ['lab_test', 'prescription', 'imaging', 'consultation', 'vaccination'];
 
-  const mockSearchResults = [
-    {
-      id: 'patient-search-1',
-      name: 'Alex Johnson',
-      email: 'alex.johnson@example.com',
-      phone: '+1234567890',
-      age: 42,
-      abdmId: 'ABDM123456789'
-    },
-    {
-      id: 'patient-search-2',
-      name: 'Maria Garcia',
-      email: 'maria.garcia@example.com',
-      phone: '+1234567891',
-      age: 35,
-      abdmId: 'ABDM987654321'
-    }
-  ];
+  // No mock data - search real users from Supabase
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
@@ -59,31 +43,67 @@ const AddPatient = () => {
     }
 
     setIsSearching(true);
+    
     try {
-      // Simulate search delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      console.log('🔍 Searching for patients with query:', searchQuery);
       
-      // Filter mock results based on search query
-      const results = mockSearchResults.filter(patient => 
-        patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        patient.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        patient.abdmId.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      
-      setSearchResults(results);
-      
-      if (results.length === 0) {
+      // Search in profiles table for users with role 'patient'
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'patient')
+        .or(`full_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%`);
+
+      if (error) {
+        console.error('❌ Error searching patients:', error);
         toast({
-          title: "No patients found",
-          description: "Try a different search term or check the patient details",
+          title: "Search Error",
+          description: "Failed to search for patients. Please try again.",
+          variant: "destructive"
+        });
+        setSearchResults([]);
+        return;
+      }
+
+      console.log('📊 Search results:', profiles);
+
+      if (profiles && profiles.length > 0) {
+        // Convert profiles to search result format
+        const results = profiles.map((profile, index) => ({
+          id: profile.user_id || `patient-${index}`,
+          name: profile.full_name || 'Unknown Patient',
+          email: profile.email || '',
+          phone: profile.phone || '',
+          age: profile.date_of_birth ? 
+            new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear() : 0,
+          abdmId: 'Not Available' // ABDM ID not available in current schema
+        }));
+        
+        setSearchResults(results);
+        
+        if (results.length === 0) {
+          toast({
+            title: "No Results",
+            description: "No patients found matching your search criteria",
+            variant: "destructive"
+          });
+        }
+      } else {
+        setSearchResults([]);
+        toast({
+          title: "No Results",
+          description: "No patients found matching your search criteria",
+          variant: "destructive"
         });
       }
     } catch (error) {
+      console.error('❌ Error searching patients:', error);
       toast({
-        title: "Search failed",
-        description: "An error occurred while searching for patients",
+        title: "Search Error",
+        description: "Failed to search for patients. Please try again.",
         variant: "destructive"
       });
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
@@ -175,7 +195,7 @@ const AddPatient = () => {
                   placeholder="Enter patient name, email, phone, or ABDM ID..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
                 <Button 
                   onClick={handleSearch} 

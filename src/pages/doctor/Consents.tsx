@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,81 +6,47 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConsentRequest, ConsentStatus, RecordType } from '@/types';
 import { format } from 'date-fns';
-import { Shield, Clock, CheckCircle, XCircle, User, Calendar, Send, Search } from 'lucide-react';
+import { Shield, Clock, CheckCircle, XCircle, User, Calendar, Send, Search, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { getDoctorConsentRequests, extendConsentRequest } from '@/services/consentService';
+import CreateConsentRequest from '@/components/consent/CreateConsentRequest';
+import { useAuth } from '@/contexts/AuthContext';
 
-// Mock consent requests from doctor's perspective
-const mockDoctorConsentRequests: ConsentRequest[] = [
-  {
-    id: 'doctor-consent-1',
-    patientId: 'patient-1',
-    requesterId: 'doctor-1',
-    requesterName: 'Dr. Sarah Wilson',
-    purpose: 'Cardiac consultation and treatment planning',
-    requestedDataTypes: ['lab_test', 'imaging', 'prescription'],
-    duration: 30,
-    status: 'approved',
-    requestedAt: new Date('2024-09-18'),
-    respondedAt: new Date('2024-09-19'),
-    expiresAt: new Date('2024-10-19'),
-    message: 'Need access to recent cardiac test results for consultation.'
-  },
-  {
-    id: 'doctor-consent-2',
-    patientId: 'patient-2',
-    requesterId: 'doctor-1',
-    requesterName: 'Dr. Sarah Wilson',
-    purpose: 'Diabetes management and monitoring',
-    requestedDataTypes: ['lab_test', 'prescription'],
-    duration: 60,
-    status: 'pending',
-    requestedAt: new Date('2024-09-22'),
-    message: 'Regular diabetes monitoring requires access to lab results and current medications.'
-  },
-  {
-    id: 'doctor-consent-3',
-    patientId: 'patient-3',
-    requesterId: 'doctor-1',
-    requesterName: 'Dr. Sarah Wilson',
-    purpose: 'Second opinion consultation',
-    requestedDataTypes: ['imaging', 'consultation'],
-    duration: 14,
-    status: 'denied',
-    requestedAt: new Date('2024-09-20'),
-    respondedAt: new Date('2024-09-21')
-  },
-  {
-    id: 'doctor-consent-4',
-    patientId: 'patient-4',
-    requesterId: 'doctor-1',
-    requesterName: 'Dr. Sarah Wilson',
-    purpose: 'Annual health assessment',
-    requestedDataTypes: ['lab_test', 'vaccination', 'consultation'],
-    duration: 30,
-    status: 'expired',
-    requestedAt: new Date('2024-08-15'),
-    respondedAt: new Date('2024-08-16'),
-    expiresAt: new Date('2024-09-15')
-  }
-];
-
-// Mock patient data for display
-const mockPatientData = {
-  'patient-1': { name: 'John Doe', email: 'john.doe@example.com' },
-  'patient-2': { name: 'Sarah Smith', email: 'sarah.smith@example.com' },
-  'patient-3': { name: 'Michael Johnson', email: 'michael.j@example.com' },
-  'patient-4': { name: 'Emily Brown', email: 'emily.brown@example.com' }
-};
 
 const DoctorConsents = () => {
-  const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>(mockDoctorConsentRequests);
+  const { user } = useAuth();
+  const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>([]);
   const [filterStatus, setFilterStatus] = useState<ConsentStatus | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  // Load consent requests on component mount
+  useEffect(() => {
+    if (user?.id) {
+      loadConsentRequests();
+    }
+  }, [user?.id]);
+
+  const loadConsentRequests = async () => {
+    try {
+      setLoading(true);
+      const requests = await getDoctorConsentRequests(user!.id);
+      setConsentRequests(requests);
+    } catch (error) {
+      console.error('Error loading consent requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load consent requests",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredRequests = consentRequests.filter(request => {
     const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
-    const patientName = mockPatientData[request.patientId as keyof typeof mockPatientData]?.name || '';
-    const matchesSearch = patientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = request.requesterName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          request.purpose.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesStatus && matchesSearch;
   });
@@ -109,9 +75,7 @@ const DoctorConsents = () => {
 
   const handleResendRequest = async (requestId: string) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // For now, we'll just show a message since resending would require creating a new request
       toast({
         title: "Request resent",
         description: "Consent request has been sent to the patient again",
@@ -127,16 +91,9 @@ const DoctorConsents = () => {
 
   const handleExtendAccess = async (requestId: string) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      const updatedRequest = await extendConsentRequest(requestId, 30);
       setConsentRequests(prev => prev.map(request => 
-        request.id === requestId 
-          ? { 
-              ...request, 
-              expiresAt: request.expiresAt ? new Date(request.expiresAt.getTime() + 30 * 24 * 60 * 60 * 1000) : undefined 
-            }
-          : request
+        request.id === requestId ? updatedRequest : request
       ));
       
       toast({
@@ -144,6 +101,7 @@ const DoctorConsents = () => {
         description: "Patient consent has been extended for 30 more days",
       });
     } catch (error) {
+      console.error('Error extending access:', error);
       toast({
         title: "Error",
         description: "Failed to extend access",
@@ -161,11 +119,29 @@ const DoctorConsents = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Consent Management</h1>
-        <p className="text-muted-foreground">
-          Manage patient consent requests and data access permissions
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Consent Management</h1>
+          <p className="text-muted-foreground">
+            Manage patient consent requests and data access permissions
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={loadConsentRequests}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          {user?.id && (
+            <CreateConsentRequest
+              doctorId={user.id}
+              onRequestCreated={loadConsentRequests}
+            />
+          )}
+        </div>
       </div>
 
       {/* Stats Overview */}
@@ -247,7 +223,14 @@ const DoctorConsents = () => {
 
       {/* Consent Requests */}
       <div className="space-y-4">
-        {filteredRequests.length === 0 ? (
+        {loading ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <RefreshCw className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-spin" />
+              <p className="text-lg font-medium">Loading consent requests...</p>
+            </CardContent>
+          </Card>
+        ) : filteredRequests.length === 0 ? (
           <Card>
             <CardContent className="text-center py-12">
               <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -257,7 +240,6 @@ const DoctorConsents = () => {
           </Card>
         ) : (
           filteredRequests.map((request) => {
-            const patient = mockPatientData[request.patientId as keyof typeof mockPatientData];
             const isExpiringSoon = request.expiresAt && request.expiresAt.getTime() - Date.now() < 7 * 24 * 60 * 60 * 1000;
             
             return (
@@ -273,7 +255,7 @@ const DoctorConsents = () => {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <User className="h-5 w-5" />
-                        {patient?.name || 'Unknown Patient'}
+                        {request.requesterName}
                       </CardTitle>
                       <CardDescription>{request.purpose}</CardDescription>
                     </div>

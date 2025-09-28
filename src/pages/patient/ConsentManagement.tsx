@@ -1,30 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { mockConsentRequests } from '@/services/mockData';
 import { ConsentRequest, ConsentStatus, RecordType } from '@/types';
 import { format } from 'date-fns';
-import { Shield, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar } from 'lucide-react';
+import { Shield, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { getPatientConsentRequests, respondToConsentRequest, revokeConsentRequest } from '@/services/consentService';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ConsentManagement = () => {
-  const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>(mockConsentRequests);
+  const { user } = useAuth();
+  const [consentRequests, setConsentRequests] = useState<ConsentRequest[]>([]);
   const [selectedDataTypes, setSelectedDataTypes] = useState<RecordType[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load consent requests on component mount
+  useEffect(() => {
+    if (user?.id) {
+      loadConsentRequests();
+    }
+  }, [user?.id]);
+
+  const loadConsentRequests = async () => {
+    try {
+      setLoading(true);
+      const requests = await getPatientConsentRequests(user!.id);
+      setConsentRequests(requests);
+    } catch (error) {
+      console.error('Error loading consent requests:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load consent requests",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConsentResponse = async (requestId: string, status: 'approved' | 'denied', dataTypes?: RecordType[]) => {
     try {
+      const updatedRequest = await respondToConsentRequest(requestId, { status, dataTypes });
       setConsentRequests(prev => prev.map(request => 
-        request.id === requestId 
-          ? {
-              ...request,
-              status,
-              respondedAt: new Date(),
-              expiresAt: status === 'approved' ? new Date(Date.now() + request.duration * 24 * 60 * 60 * 1000) : undefined
-            }
-          : request
+        request.id === requestId ? updatedRequest : request
       ));
 
       toast({
@@ -35,6 +56,7 @@ const ConsentManagement = () => {
       setSelectedRequest(null);
       setSelectedDataTypes([]);
     } catch (error) {
+      console.error('Error responding to consent request:', error);
       toast({
         title: "Error",
         description: "Failed to update consent",
@@ -45,10 +67,9 @@ const ConsentManagement = () => {
 
   const handleRevokeConsent = async (requestId: string) => {
     try {
+      const updatedRequest = await revokeConsentRequest(requestId);
       setConsentRequests(prev => prev.map(request => 
-        request.id === requestId 
-          ? { ...request, status: 'revoked' as ConsentStatus }
-          : request
+        request.id === requestId ? updatedRequest : request
       ));
 
       toast({
@@ -56,6 +77,7 @@ const ConsentManagement = () => {
         description: "Access has been revoked successfully",
       });
     } catch (error) {
+      console.error('Error revoking consent:', error);
       toast({
         title: "Error",
         description: "Failed to revoke consent",
@@ -92,11 +114,21 @@ const ConsentManagement = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Consent Management</h1>
-        <p className="text-muted-foreground">
-          Control who has access to your health data and for what purpose
-        </p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">Consent Management</h1>
+          <p className="text-muted-foreground">
+            Control who has access to your health data and for what purpose
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={loadConsentRequests}
+          disabled={loading}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {/* Stats Overview */}
@@ -136,11 +168,21 @@ const ConsentManagement = () => {
         </Card>
       </div>
 
-      {/* Pending Requests */}
-      {pendingRequests.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold text-warning">Pending Consent Requests</h2>
-          {pendingRequests.map((request) => (
+      {/* Loading State */}
+      {loading ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <RefreshCw className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-spin" />
+            <p className="text-lg font-medium">Loading consent requests...</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Pending Requests */}
+          {pendingRequests.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-warning">Pending Consent Requests</h2>
+              {pendingRequests.map((request) => (
             <Card key={request.id} className="border-warning">
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -344,6 +386,8 @@ const ConsentManagement = () => {
             </Card>
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   );
