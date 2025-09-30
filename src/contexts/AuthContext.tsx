@@ -24,9 +24,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
 
-
   useEffect(() => {
     console.log('🔧 AuthContext: useEffect started');
+    
+    // Set a timeout to prevent infinite loading
+    const loadingTimeout = setTimeout(() => {
+      console.log('🔧 AuthContext: Loading timeout reached, setting loading to false');
+      setIsLoading(false);
+    }, 5000); // 5 second timeout
     
     // Get initial session
     const getInitialSession = async () => {
@@ -37,70 +42,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (session?.user) {
           setSession(session);
           
-          // Load user profile from database
-          const loadUserProfile = async () => {
-            try {
-              const { data: profile, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('user_id', session.user.id)
-                .single();
-
-              if (error) {
-                console.error('Error loading profile:', error);
-                // Fallback to session metadata
-                const userData = {
-                  id: session.user.id,
-                  name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-                  email: session.user.email || '',
-                  phone: '',
-                  role: (session.user.user_metadata?.role as UserRole) || 'patient',
-                  dateOfBirth: undefined,
-                  gender: undefined,
-                  bloodGroup: undefined,
-                  allergies: [],
-                  emergencyContact: undefined,
-                  specialization: undefined,
-                  licenseNumber: undefined,
-                  hospitalAffiliation: undefined,
-                  createdAt: new Date(session.user.created_at),
-                  updatedAt: new Date(session.user.updated_at),
-                } as any;
-                setUser(userData);
-              } else {
-                // Use profile data from database
-                const userData = {
-                  id: profile.user_id,
-                  name: profile.full_name,
-                  email: profile.email,
-                  phone: profile.phone || '',
-                  role: profile.role as UserRole,
-                  dateOfBirth: profile.date_of_birth ? new Date(profile.date_of_birth) : undefined,
-                  gender: profile.gender,
-                  bloodGroup: profile.blood_group,
-                  allergies: profile.allergies || [],
-                  emergencyContact: profile.emergency_contact_name ? {
-                    name: profile.emergency_contact_name,
-                    phone: profile.emergency_contact_phone,
-                    relationship: profile.emergency_contact_relationship
-                  } : undefined,
-                  specialization: profile.specialization,
-                  licenseNumber: profile.license_number,
-                  hospitalAffiliation: profile.hospital_affiliation,
-                  createdAt: new Date(profile.created_at),
-                  updatedAt: new Date(profile.updated_at),
-                } as any;
-                console.log('🔧 AuthContext: Setting user data from profile', userData);
-                setUser(userData);
-              }
-            } catch (error) {
-              console.error('Error in loadUserProfile:', error);
-              setUser(null);
-            }
-          };
+        // Create basic user data from session metadata
+        const role = (session.user.user_metadata?.role as UserRole) || 'patient';
+        const userData = {
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || '',
+          phone: '',
+          role,
+          dateOfBirth: undefined,
+          gender: undefined,
+          bloodGroup: undefined,
+          allergies: [],
+          emergencyContact: undefined,
+          ...(role === 'doctor' ? {
+            specialization: 'General Medicine',
+            licenseNumber: undefined,
+            hospitalAffiliation: 'General Hospital',
+            verified: false
+          } : {}),
+          createdAt: new Date(session.user.created_at),
+          updatedAt: new Date(session.user.updated_at),
+        } as (Patient | Doctor) & { id: string };
           
-          loadUserProfile();
+          console.log('🔧 AuthContext: Setting user data', userData);
+          setUser(userData);
         } else {
+          console.log('🔧 AuthContext: No session, setting user to null');
           setUser(null);
         }
       } catch (error) {
@@ -108,6 +76,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser(null);
       } finally {
         console.log('🔧 AuthContext: Setting initial loading to false');
+        clearTimeout(loadingTimeout);
         setIsLoading(false);
       }
     };
@@ -121,39 +90,46 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         
         setSession(session);
         if (session?.user) {
-          // Create basic user data from session metadata
-          const userData = {
-            id: session.user.id,
-            name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
-            email: session.user.email || '',
-            phone: '',
-            role: (session.user.user_metadata?.role as UserRole) || 'patient',
-            dateOfBirth: undefined,
-            gender: undefined,
-            bloodGroup: undefined,
-            allergies: [],
-            emergencyContact: undefined,
-            specialization: undefined,
+        // Create basic user data from session metadata
+        const role = (session.user.user_metadata?.role as UserRole) || 'patient';
+        const userData = {
+          id: session.user.id,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+          email: session.user.email || '',
+          phone: '',
+          role,
+          dateOfBirth: undefined,
+          gender: undefined,
+          bloodGroup: undefined,
+          allergies: [],
+          emergencyContact: undefined,
+          ...(role === 'doctor' ? {
+            specialization: 'General Medicine',
             licenseNumber: undefined,
-            hospitalAffiliation: undefined,
-            createdAt: new Date(session.user.created_at),
-            updatedAt: new Date(session.user.updated_at),
-          } as any;
+            hospitalAffiliation: 'General Hospital',
+            verified: false
+          } : {}),
+          createdAt: new Date(session.user.created_at),
+          updatedAt: new Date(session.user.updated_at),
+        } as (Patient | Doctor) & { id: string };
           
           console.log('🔧 AuthContext: Setting user data during auth change', userData);
           setUser(userData);
-          
-          // Force a re-render by updating loading state
-          console.log('🔧 AuthContext: User data set, triggering re-render');
         } else {
           console.log('🔧 AuthContext: No session/user, setting user to null');
           setUser(null);
         }
+        
+        // Always set loading to false after processing auth state change
+        console.log('🔧 AuthContext: Setting loading to false after auth state change');
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
       }
     );
 
     return () => {
       console.log('🔧 AuthContext: Cleaning up subscription');
+      clearTimeout(loadingTimeout);
       subscription.unsubscribe();
     };
   }, []);
@@ -175,33 +151,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       if (data.user) {
-        console.log('🔧 User logged in:', data.user.id);
+        console.log('🔧 Login successful, user:', data.user);
         
-        // Load user profile from database
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', data.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('Profile error:', profileError);
-          // Create a basic profile if it doesn't exist
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert({
-              user_id: data.user.id,
-              full_name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              email: data.user.email,
-              role: data.user.user_metadata?.role || 'patient'
-            });
-          
-          if (insertError) {
-            console.error('Profile creation error:', insertError);
-          }
-        } else {
-          console.log('🔧 Profile loaded:', profile);
-        }
+        // Create basic user data from session metadata
+        const role = (data.user.user_metadata?.role as UserRole) || 'patient';
+        const userData = {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          email: data.user.email || '',
+          phone: '',
+          role,
+          dateOfBirth: undefined,
+          gender: undefined,
+          bloodGroup: undefined,
+          allergies: [],
+          emergencyContact: undefined,
+          ...(role === 'doctor' ? {
+            specialization: 'General Medicine',
+            licenseNumber: undefined,
+            hospitalAffiliation: 'General Hospital',
+            verified: false
+          } : {}),
+          createdAt: new Date(data.user.created_at),
+          updatedAt: new Date(data.user.updated_at),
+        } as (Patient | Doctor) & { id: string };
+        
+        console.log('🔧 AuthContext: Setting user data during login', userData);
+        setUser(userData);
       }
 
       toast({
@@ -209,7 +185,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         description: `Welcome back!`,
       });
 
-      // The auth state change listener will handle setting the user data
     } catch (error: any) {
       console.error('Login failed:', error);
       toast({
@@ -239,36 +214,40 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (error) throw error;
 
       if (data.user) {
-        // Update profile with additional data
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            full_name: userData.name,
-            phone: userData.phone,
-            role: userData.role || 'patient',
-            date_of_birth: userData.dateOfBirth,
-            gender: userData.gender,
-            blood_group: userData.bloodGroup,
-            allergies: userData.allergies,
-            emergency_contact_name: userData.emergencyContact?.name,
-            emergency_contact_phone: userData.emergencyContact?.phone,
-            emergency_contact_relationship: userData.emergencyContact?.relationship,
-            specialization: userData.specialization,
-            license_number: userData.licenseNumber,
-            hospital_affiliation: userData.hospitalAffiliation,
-          })
-          .eq('user_id', data.user.id);
-
-        if (profileError) console.error('Profile update error:', profileError);
+        console.log('🔧 Registration successful, user:', data.user);
+        
+        // Create basic user data from session metadata
+        const newUserData = {
+          id: data.user.id,
+          name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
+          email: data.user.email || '',
+          phone: '',
+          role: (data.user.user_metadata?.role as UserRole) || 'patient',
+          dateOfBirth: undefined,
+          gender: undefined,
+          bloodGroup: undefined,
+          allergies: [],
+          emergencyContact: undefined,
+          specialization: data.user.user_metadata?.role === 'doctor' ? 'General Medicine' : undefined,
+          licenseNumber: undefined,
+          hospitalAffiliation: data.user.user_metadata?.role === 'doctor' ? 'General Hospital' : undefined,
+          createdAt: new Date(data.user.created_at),
+          updatedAt: new Date(data.user.updated_at),
+        } as any;
+        
+        console.log('🔧 AuthContext: Setting user data during registration', newUserData);
+        setUser(newUserData);
       }
 
       console.log('🔧 AuthContext: Registration successful');
+
       toast({
         title: "Registration successful",
-        description: "Please check your email to confirm your account.",
+        description: "Please check your email to verify your account.",
       });
+
     } catch (error: any) {
-      console.error('🔧 AuthContext: Registration failed', error);
+      console.error('Registration failed:', error);
       toast({
         title: "Registration failed",
         description: error.message,
@@ -278,61 +257,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate('/');
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Logout failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
+  const logout = () => {
+    console.log('🔧 AuthContext: Logout called');
+    supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
+    navigate('/auth');
   };
 
-  const updateProfile = async (updates: any) => {
-    if (!user || !session) return;
-
-    console.log('🔧 AuthContext: Update profile started');
+  const updateProfile = async (updates: Partial<Patient | Doctor>) => {
+    if (!user) return;
+    
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: updates.name,
-          phone: updates.phone,
-          date_of_birth: updates.dateOfBirth,
-          gender: updates.gender,
-          blood_group: updates.bloodGroup,
-          allergies: updates.allergies,
-          emergency_contact_name: updates.emergencyContact?.name,
-          emergency_contact_phone: updates.emergencyContact?.phone,
-          emergency_contact_relationship: updates.emergencyContact?.relationship,
-          specialization: updates.specialization,
-          license_number: updates.licenseNumber,
-          hospital_affiliation: updates.hospitalAffiliation,
-        })
-        .eq('user_id', session.user.id);
-
-      if (error) throw error;
-
-      console.log('🔧 AuthContext: Profile updated successfully');
+      const updatedUser = { ...user, ...updates } as (Patient | Doctor) & { id: string };
+      setUser(updatedUser);
+      
       toast({
         title: "Profile updated",
-        description: "Your profile has been successfully updated.",
+        description: "Your profile has been updated successfully.",
       });
-    } catch (error: any) {
-      console.error('🔧 AuthContext: Profile update failed', error);
+    } catch (error) {
+      console.error('Profile update failed:', error);
       toast({
         title: "Update failed",
-        description: error.message,
+        description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
-      throw error;
     }
   };
 
@@ -340,12 +290,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     user,
     session,
     isLoading,
-    isAuthenticated: !!session?.user,
+    isAuthenticated: !!user,
     login,
     register,
     logout,
     updateProfile,
   };
+
+  console.log('🔧 AuthContext: Rendering with value', { isLoading, isAuthenticated: !!user, hasUser: !!user });
 
   return (
     <AuthContext.Provider value={value}>

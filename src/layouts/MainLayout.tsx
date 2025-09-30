@@ -12,7 +12,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { isAuthenticated, isLoading, user } = useAuth();
   const navigate = useNavigate();
 
-  console.log('🔧 MainLayout: Render state', { isAuthenticated, isLoading, hasUser: !!user });
+  console.log('🔧 MainLayout: Render state', { isAuthenticated, isLoading, hasUser: !!user, user: user });
 
   useEffect(() => {
     console.log('🔧 MainLayout: useEffect triggered', { isAuthenticated, isLoading });
@@ -47,6 +47,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       <div className="flex">
         <Sidebar />
         <main className="flex-1 p-6 overflow-auto">
+          {console.log('🔧 MainLayout: Rendering children:', children)}
           {children}
         </main>
       </div>

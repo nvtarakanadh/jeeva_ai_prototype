@@ -68,19 +68,48 @@ const DoctorPatients = () => {
             profile.role !== 'doctor' && profile.role !== 'admin'
           );
           
-          // Convert to Patient format
-          const patientData: Patient[] = patientProfiles.map((profile, index) => ({
-            id: profile.user_id || profile.id || `patient-${index}`,
-            name: profile.full_name || 'Unknown Patient',
-            email: profile.email || '',
-            age: profile.date_of_birth ? 
-              new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear() : 25,
-            gender: profile.gender || 'Unknown',
-            lastVisit: new Date(profile.updated_at || profile.created_at || new Date()),
-            condition: 'General Checkup',
-            consentStatus: 'active' as const,
-            recordCount: Math.floor(Math.random() * 10) + 1
-          }));
+          // Convert to Patient format and get record counts
+          const patientData: Patient[] = await Promise.all(
+            patientProfiles.map(async (profile, index) => {
+              // Get record count for this patient
+              let recordCount = 0;
+              try {
+                const { data: healthRecords } = await supabase
+                  .from('health_records')
+                  .select('id')
+                  .eq('user_id', profile.user_id);
+                
+                const { data: prescriptions } = await supabase
+                  .from('prescriptions')
+                  .select('id')
+                  .eq('patient_id', profile.id);
+                
+                const { data: consultationNotes } = await supabase
+                  .from('consultation_notes')
+                  .select('id')
+                  .eq('patient_id', profile.id);
+                
+                recordCount = (healthRecords?.length || 0) + 
+                             (prescriptions?.length || 0) + 
+                             (consultationNotes?.length || 0);
+              } catch (error) {
+                console.warn(`Error getting record count for patient ${profile.id}:`, error);
+              }
+
+              return {
+                id: profile.user_id || profile.id || `patient-${index}`,
+                name: profile.full_name || 'Unknown Patient',
+                email: profile.email || '',
+                age: profile.date_of_birth ? 
+                  new Date().getFullYear() - new Date(profile.date_of_birth).getFullYear() : 25,
+                gender: profile.gender || 'Unknown',
+                lastVisit: new Date(profile.updated_at || profile.created_at || new Date()),
+                condition: 'General Checkup',
+                consentStatus: 'active' as const,
+                recordCount: recordCount
+              };
+            })
+          );
           
           setPatients(patientData);
         } else {

@@ -179,6 +179,15 @@ export const respondToConsentRequest = async (
   response: ConsentResponseData
 ): Promise<ConsentRequest> => {
   try {
+    // First, get the original request to understand what access was requested
+    const { data: originalRequest, error: fetchError } = await supabase
+      .from('consent_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     const updateData: any = {
       status: response.status === 'approved' ? 'approved' : 'denied',
       responded_at: new Date().toISOString(),
@@ -188,10 +197,11 @@ export const respondToConsentRequest = async (
     if (response.status === 'approved') {
       // Set expiration date based on duration (default 30 days)
       const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
+      expiresAt.setDate(expiresAt.getDate() + (originalRequest.duration_days || 30));
       updateData.expires_at = expiresAt.toISOString();
     }
 
+    // Update the consent request
     const { data, error } = await supabase
       .from('consent_requests')
       .update(updateData)
@@ -200,6 +210,47 @@ export const respondToConsentRequest = async (
       .single();
 
     if (error) throw error;
+
+    // If approved, create patient_access records for each requested data type
+    if (response.status === 'approved') {
+      console.log('Creating patient access records for approved consent:', {
+        patientId: originalRequest.patient_id,
+        doctorId: originalRequest.doctor_id,
+        requestedDataTypes: originalRequest.requested_data_types,
+        expiresAt: updateData.expires_at
+      });
+
+      // Map data types to access types
+      const accessTypeMap: Record<string, string> = {
+        'health_records': 'view_records',
+        'prescriptions': 'view_prescriptions', 
+        'consultation_notes': 'view_consultation_notes',
+        'all': 'all'
+      };
+
+      // Create access records for each requested data type
+      for (const dataType of originalRequest.requested_data_types || []) {
+        const accessType = accessTypeMap[dataType] || 'view_records';
+        
+        const { error: accessError } = await supabase
+          .from('patient_access')
+          .insert({
+            patient_id: originalRequest.patient_id,
+            doctor_id: originalRequest.doctor_id,
+            access_type: accessType,
+            granted_at: new Date().toISOString(),
+            expires_at: updateData.expires_at,
+            status: 'active'
+          });
+
+        if (accessError) {
+          console.error('Error creating patient access record:', accessError);
+          // Don't throw here, just log the error and continue
+        } else {
+          console.log(`Created patient access record for ${accessType}`);
+        }
+      }
+    }
 
     const doctorName = await getDoctorName(data.doctor_id);
 
@@ -226,6 +277,16 @@ export const respondToConsentRequest = async (
 // Revoke a consent request
 export const revokeConsentRequest = async (requestId: string): Promise<ConsentRequest> => {
   try {
+    // First, get the original request to understand what access needs to be revoked
+    const { data: originalRequest, error: fetchError } = await supabase
+      .from('consent_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Update the consent request
     const { data, error } = await supabase
       .from('consent_requests')
       .update({
@@ -237,6 +298,29 @@ export const revokeConsentRequest = async (requestId: string): Promise<ConsentRe
       .single();
 
     if (error) throw error;
+
+    // Revoke corresponding patient_access records
+    console.log('Revoking patient access records for revoked consent:', {
+      patientId: originalRequest.patient_id,
+      doctorId: originalRequest.doctor_id
+    });
+
+    const { error: revokeError } = await supabase
+      .from('patient_access')
+      .update({
+        status: 'revoked',
+        updated_at: new Date().toISOString()
+      })
+      .eq('patient_id', originalRequest.patient_id)
+      .eq('doctor_id', originalRequest.doctor_id)
+      .eq('status', 'active');
+
+    if (revokeError) {
+      console.error('Error revoking patient access records:', revokeError);
+      // Don't throw here, just log the error
+    } else {
+      console.log('Successfully revoked patient access records');
+    }
 
     const doctorName = await getDoctorName(data.doctor_id);
 
@@ -313,7 +397,7 @@ export const getPatientsForDoctor = async (doctorId: string) => {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('user_id, full_name, email, role')
+      .select('id, full_name, email, role')
       .eq('role', 'patient')
       .order('full_name');
 
@@ -323,7 +407,7 @@ export const getPatientsForDoctor = async (doctorId: string) => {
     }
 
     const patients = data.map(patient => ({
-      id: patient.user_id,
+      id: patient.id, // FIXED: Use profile ID instead of user_id
       name: patient.full_name,
       email: patient.email
     }));
@@ -331,6 +415,86 @@ export const getPatientsForDoctor = async (doctorId: string) => {
     return patients;
   } catch (error) {
     console.error('Error fetching patients for doctor:', error);
+    throw error;
+  }
+};
+
+// Fix existing approved consent requests by creating missing patient_access records
+export const fixExistingConsentAccess = async (): Promise<void> => {
+  try {
+    console.log('Fixing existing approved consent requests...');
+    
+    // Get all approved consent requests that don't have corresponding patient_access records
+    const { data: approvedConsents, error: consentError } = await supabase
+      .from('consent_requests')
+      .select('*')
+      .eq('status', 'approved');
+
+    if (consentError) throw consentError;
+
+    if (!approvedConsents || approvedConsents.length === 0) {
+      console.log('No approved consent requests found.');
+      return;
+    }
+
+    console.log(`Found ${approvedConsents.length} approved consent requests`);
+
+    for (const consent of approvedConsents) {
+      // Check if patient_access records already exist for this consent
+      const { data: existingAccess, error: accessCheckError } = await supabase
+        .from('patient_access')
+        .select('id')
+        .eq('patient_id', consent.patient_id)
+        .eq('doctor_id', consent.doctor_id)
+        .eq('status', 'active');
+
+      if (accessCheckError) {
+        console.error('Error checking existing access:', accessCheckError);
+        continue;
+      }
+
+      if (existingAccess && existingAccess.length > 0) {
+        console.log(`Access records already exist for consent ${consent.id}`);
+        continue;
+      }
+
+      // Create patient_access records for this consent
+      console.log(`Creating access records for consent ${consent.id}`);
+      
+      // Map data types to access types
+      const accessTypeMap: Record<string, string> = {
+        'health_records': 'view_records',
+        'prescriptions': 'view_prescriptions', 
+        'consultation_notes': 'view_consultation_notes',
+        'all': 'all'
+      };
+
+      // Create access records for each requested data type
+      for (const dataType of consent.requested_data_types || []) {
+        const accessType = accessTypeMap[dataType] || 'view_records';
+        
+        const { error: accessError } = await supabase
+          .from('patient_access')
+          .insert({
+            patient_id: consent.patient_id,
+            doctor_id: consent.doctor_id,
+            access_type: accessType,
+            granted_at: consent.responded_at || consent.requested_at,
+            expires_at: consent.expires_at,
+            status: 'active'
+          });
+
+        if (accessError) {
+          console.error(`Error creating patient access record for ${accessType}:`, accessError);
+        } else {
+          console.log(`Created patient access record for ${accessType}`);
+        }
+      }
+    }
+
+    console.log('Finished fixing existing consent requests.');
+  } catch (error) {
+    console.error('Error fixing existing consent access:', error);
     throw error;
   }
 };

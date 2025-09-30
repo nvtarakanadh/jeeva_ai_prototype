@@ -1,30 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Brain, Shield, Upload, Activity, AlertCircle } from 'lucide-react';
+import { FileText, Brain, Shield, Upload, Activity, AlertCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getHealthRecordSummary } from '@/services/healthRecordsService';
+import { getAIInsightSummary } from '@/services/aiInsightsService';
+import { getRecentActivity, formatTimeAgo } from '@/services/activityService';
+import { getHealthAlerts } from '@/services/healthAlertsService';
+import { getPatientConsentRequests } from '@/services/consentService';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  const [loading, setLoading] = useState(true);
+  const [healthRecords, setHealthRecords] = useState({ totalRecords: 0, recentRecords: [] });
+  const [aiInsights, setAiInsights] = useState({ totalInsights: 0, recentInsights: [], averageConfidence: 0 });
+  const [activeConsents, setActiveConsents] = useState(0);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [healthAlerts, setHealthAlerts] = useState([]);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!user?.id) return;
+      
+      try {
+        setLoading(true);
+        
+        // Load all data in parallel
+        const [
+          healthRecordsData,
+          aiInsightsData,
+          consentRequestsData,
+          activityData,
+          alertsData
+        ] = await Promise.all([
+          getHealthRecordSummary(user.id),
+          getAIInsightSummary(user.id),
+          getPatientConsentRequests(user.id),
+          getRecentActivity(user.id),
+          getHealthAlerts(user.id)
+        ]);
+
+        setHealthRecords(healthRecordsData);
+        setAiInsights(aiInsightsData);
+        setActiveConsents(consentRequestsData.filter(consent => consent.status === 'approved').length);
+        setRecentActivity(activityData);
+        setHealthAlerts(alertsData);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [user?.id]);
 
   const quickStats = [
-    { label: 'Health Records', value: '12', icon: FileText, href: '/records' },
-    { label: 'AI Insights', value: '8', icon: Brain, href: '/ai-insights' },
-    { label: 'Active Consents', value: '3', icon: Shield, href: '/consents' },
-  ];
-
-  const recentActivity = [
-    { type: 'upload', message: 'Blood test results uploaded', time: '2 hours ago' },
-    { type: 'analysis', message: 'AI analysis completed for chest X-ray', time: '1 day ago' },
-    { type: 'consent', message: 'Consent approved for Dr. Wilson', time: '2 days ago' },
-  ];
-
-  const healthAlerts = [
-    { type: 'warning', message: 'High cholesterol levels detected in recent blood work' },
-    { type: 'info', message: 'Annual checkup due next month' },
+    { label: 'Health Records', value: healthRecords.totalRecords.toString(), icon: FileText, href: '/records' },
+    { label: 'AI Insights', value: aiInsights.totalInsights.toString(), icon: Brain, href: '/ai-insights' },
+    { label: 'Active Consents', value: activeConsents.toString(), icon: Shield, href: '/consents' },
   ];
 
   return (
@@ -35,7 +73,7 @@ const PatientDashboard = () => {
       </div>
 
       {/* Health Alerts */}
-      {healthAlerts.length > 0 && (
+      {!loading && healthAlerts.length > 0 && (
         <Card className="border-warning">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -45,8 +83,16 @@ const PatientDashboard = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {healthAlerts.map((alert, index) => (
-              <div key={index} className="flex items-start gap-3 p-3 bg-warning-light rounded-lg">
-                <AlertCircle className="h-4 w-4 text-warning mt-0.5" />
+              <div key={alert.id || index} className={`flex items-start gap-3 p-3 rounded-lg ${
+                alert.type === 'warning' ? 'bg-warning-light' : 
+                alert.type === 'error' ? 'bg-red-50' : 
+                alert.type === 'success' ? 'bg-green-50' : 'bg-blue-50'
+              }`}>
+                <AlertCircle className={`h-4 w-4 mt-0.5 ${
+                  alert.type === 'warning' ? 'text-warning' : 
+                  alert.type === 'error' ? 'text-red-500' : 
+                  alert.type === 'success' ? 'text-green-500' : 'text-blue-500'
+                }`} />
                 <span className="text-sm">{alert.message}</span>
               </div>
             ))}
@@ -68,7 +114,14 @@ const PatientDashboard = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
-                    <p className="text-3xl font-bold">{stat.value}</p>
+                    {loading ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="text-lg">Loading...</span>
+                      </div>
+                    ) : (
+                      <p className="text-3xl font-bold">{stat.value}</p>
+                    )}
                   </div>
                   <div className="p-3 bg-primary-light rounded-lg">
                     <Icon className="h-6 w-6 text-primary" />
@@ -122,19 +175,31 @@ const PatientDashboard = () => {
             <CardDescription>Your latest health management activities</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center gap-3 pb-3 border-b border-border last:border-0">
-                  <div className="p-2 bg-accent-light rounded-lg">
-                    <Activity className="h-4 w-4 text-accent" />
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+                <span className="ml-2">Loading activity...</span>
+              </div>
+            ) : recentActivity.length > 0 ? (
+              <div className="space-y-4">
+                {recentActivity.map((activity, index) => (
+                  <div key={activity.id || index} className="flex items-center gap-3 pb-3 border-b border-border last:border-0">
+                    <div className="p-2 bg-accent-light rounded-lg">
+                      <Activity className="h-4 w-4 text-accent" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground">{formatTimeAgo(activity.timestamp)}</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No recent activity</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -146,24 +211,33 @@ const PatientDashboard = () => {
           <CardDescription>Key insights from your latest health data</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-accent-light rounded-lg">
-              <p className="text-2xl font-bold text-accent">85%</p>
-              <p className="text-sm text-muted-foreground">Health Score</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading health summary...</span>
             </div>
-            <div className="text-center p-4 bg-primary-light rounded-lg">
-              <p className="text-2xl font-bold text-primary">120/80</p>
-              <p className="text-sm text-muted-foreground">Blood Pressure</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-accent-light rounded-lg">
+                <p className="text-2xl font-bold text-accent">
+                  {aiInsights.averageConfidence > 0 ? `${Math.round(aiInsights.averageConfidence * 100)}%` : 'N/A'}
+                </p>
+                <p className="text-sm text-muted-foreground">AI Confidence</p>
+              </div>
+              <div className="text-center p-4 bg-primary-light rounded-lg">
+                <p className="text-2xl font-bold text-primary">{healthRecords.totalRecords}</p>
+                <p className="text-sm text-muted-foreground">Total Records</p>
+              </div>
+              <div className="text-center p-4 bg-warning-light rounded-lg">
+                <p className="text-2xl font-bold text-warning">{aiInsights.totalInsights}</p>
+                <p className="text-sm text-muted-foreground">AI Insights</p>
+              </div>
+              <div className="text-center p-4 bg-secondary-light rounded-lg">
+                <p className="text-2xl font-bold text-secondary">{activeConsents}</p>
+                <p className="text-sm text-muted-foreground">Active Consents</p>
+              </div>
             </div>
-            <div className="text-center p-4 bg-warning-light rounded-lg">
-              <p className="text-2xl font-bold text-warning">220</p>
-              <p className="text-sm text-muted-foreground">Cholesterol</p>
-            </div>
-            <div className="text-center p-4 bg-secondary-light rounded-lg">
-              <p className="text-2xl font-bold text-secondary">98</p>
-              <p className="text-sm text-muted-foreground">Glucose</p>
-            </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

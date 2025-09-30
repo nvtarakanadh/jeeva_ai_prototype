@@ -14,7 +14,9 @@ import {
   CreditCard,
   FlaskConical,
   User,
-  Settings
+  Settings,
+  Pill,
+  Stethoscope
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -30,6 +32,9 @@ const patientNavItems: NavItem[] = [
   { label: 'Dashboard', icon: Home, href: '/dashboard', roles: ['patient'] },
   { label: 'Health Records', icon: FileText, href: '/records', roles: ['patient'] },
   { label: 'AI Insights', icon: Brain, href: '/ai-insights', roles: ['patient'] },
+  { label: 'Consultations', icon: Stethoscope, href: '/consultations', roles: ['patient'] },
+  { label: 'Prescriptions', icon: Pill, href: '/prescriptions', roles: ['patient'] },
+  { label: 'Consultation Notes', icon: Stethoscope, href: '/consultation-notes', roles: ['patient'] },
   { label: 'Consent Management', icon: Shield, href: '/consents', roles: ['patient'] },
   { label: 'Share Data', icon: Hospital, href: '/share-data', roles: ['patient'] },
   { label: 'Profile', icon: User, href: '/profile', roles: ['patient'] },
@@ -40,6 +45,10 @@ const doctorNavItems: NavItem[] = [
   { label: 'Dashboard', icon: Home, href: '/doctor/dashboard', roles: ['doctor'] },
   { label: 'My Patients', icon: Users, href: '/doctor/patients', roles: ['doctor'] },
   { label: 'Add Patient', icon: PlusCircle, href: '/doctor/add-patient', roles: ['doctor'] },
+  { label: 'Consultations', icon: Stethoscope, href: '/doctor/consultations', roles: ['doctor'] },
+  { label: 'Patient Records', icon: FileText, href: '/doctor/patient-records', roles: ['doctor'] },
+  { label: 'Prescriptions', icon: Pill, href: '/doctor/prescriptions', roles: ['doctor'] },
+  { label: 'Consultation Notes', icon: Stethoscope, href: '/doctor/consultation-notes', roles: ['doctor'] },
   { label: 'Consent Requests', icon: Shield, href: '/doctor/consents', roles: ['doctor'] },
 ];
 
