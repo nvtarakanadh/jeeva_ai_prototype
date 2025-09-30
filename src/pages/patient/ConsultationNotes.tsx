@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Stethoscope, Download, Eye, Calendar, User, Search, Filter, CheckCircle, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { getConsultationNotesForPatient, ConsultationNote } from '@/services/prescriptionService';
 import { toast } from '@/hooks/use-toast';
@@ -130,10 +131,7 @@ const PatientConsultationNotes = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading consultation notes...</p>
-          </div>
+          <PageLoadingSpinner text="Loading consultation notes..." />
         </div>
       </div>
     );

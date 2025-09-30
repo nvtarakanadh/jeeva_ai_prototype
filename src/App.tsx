@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { NotificationTest } from "@/pages/NotificationTest";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import PatientDashboard from "./pages/patient/Dashboard";
@@ -63,6 +64,9 @@ const App = () => (
                       <Route path="/doctor/consultation-notes" element={<MainLayout><ConsultationNotes /></MainLayout>} />
                       <Route path="/doctor/consultations" element={<MainLayout><DoctorConsultations /></MainLayout>} />
                       <Route path="/doctor/consents" element={<MainLayout><DoctorConsents /></MainLayout>} />
+              
+              {/* Debug Routes */}
+              <Route path="/notification-test" element={<MainLayout><NotificationTest /></MainLayout>} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

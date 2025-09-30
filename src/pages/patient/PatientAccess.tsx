@@ -15,6 +15,7 @@ import {
   PatientAccess as PatientAccessType 
 } from '@/services/patientAccessService';
 import { toast } from '@/hooks/use-toast';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 
 const PatientAccess = () => {
   const { user } = useAuth();
@@ -143,10 +144,7 @@ const PatientAccess = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading access data...</p>
-          </div>
+          <PageLoadingSpinner text="Loading access data..." />
         </div>
       </div>
     );

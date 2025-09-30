@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 // No mock data - using real Supabase data
 import { format } from 'date-fns';
+import { CardLoadingSpinner } from '@/components/ui/loading-spinner';
 import { User, Search, FileText, Brain, Clock, Eye, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -300,9 +301,7 @@ const DoctorPatients = () => {
         {loading ? (
           <Card>
             <CardContent className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-lg font-medium">Loading patients...</p>
-              <p className="text-muted-foreground">Fetching data from database</p>
+              <CardLoadingSpinner text="Loading patients..." />
             </CardContent>
           </Card>
         ) : patients.length === 0 ? (

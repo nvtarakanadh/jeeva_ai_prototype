@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConsentRequest, ConsentStatus, RecordType } from '@/types';
 import { format } from 'date-fns';
+import { CardLoadingSpinner, ButtonLoadingSpinner } from '@/components/ui/loading-spinner';
 import { Shield, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getPatientConsentRequests, respondToConsentRequest, revokeConsentRequest } from '@/services/consentService';
@@ -158,7 +159,7 @@ const ConsentManagement = () => {
           onClick={loadConsentRequests}
           disabled={loading}
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          {loading ? <ButtonLoadingSpinner /> : <RefreshCw className="h-4 w-4 mr-2" />}
           Refresh
         </Button>
       </div>
@@ -204,8 +205,7 @@ const ConsentManagement = () => {
       {loading ? (
         <Card>
           <CardContent className="text-center py-12">
-            <RefreshCw className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-spin" />
-            <p className="text-lg font-medium">Loading consent requests...</p>
+            <CardLoadingSpinner text="Loading consent requests..." />
           </CardContent>
         </Card>
       ) : (

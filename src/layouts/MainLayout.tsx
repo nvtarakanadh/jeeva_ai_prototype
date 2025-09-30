@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageSkeleton } from '@/components/ui/skeleton-loading';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -24,14 +25,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   if (isLoading) {
     console.log('🔧 MainLayout: Showing loading state');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   if (!isAuthenticated) {

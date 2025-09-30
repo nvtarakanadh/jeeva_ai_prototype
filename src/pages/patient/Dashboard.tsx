@@ -3,12 +3,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, Brain, Shield, Upload, Activity, AlertCircle, Loader2 } from 'lucide-react';
+import { FileText, Brain, Shield, Upload, Activity, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getHealthRecordSummary } from '@/services/healthRecordsService';
 import { getAIInsightSummary } from '@/services/aiInsightsService';
 import { getRecentActivity, formatTimeAgo } from '@/services/activityService';
 import { getHealthAlerts } from '@/services/healthAlertsService';
+import { InlineLoadingSpinner, CardLoadingSpinner } from '@/components/ui/loading-spinner';
+import { PageSkeleton, DashboardStatsSkeleton, ListSkeleton } from '@/components/ui/skeleton-loading';
+import { cacheService, createCacheKey, CACHE_TTL } from '@/services/cacheService';
 import { getPatientConsentRequests } from '@/services/consentService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -30,17 +33,24 @@ const PatientDashboard = () => {
       try {
         setLoading(true);
         
-        // Load all data in parallel
-        // First get patient profile ID
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('role', 'patient')
-          .single();
+        // Check cache first for critical data
+        const profileCacheKey = createCacheKey('patient-profile', user.id);
+        let profile = cacheService.get(profileCacheKey);
+        
+        if (!profile) {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('role', 'patient')
+            .single();
 
-        if (profileError) throw profileError;
+          if (profileError) throw profileError;
+          profile = profileData;
+          cacheService.set(profileCacheKey, profile, CACHE_TTL.LONG);
+        }
 
+        // Load all data in parallel with caching
         const [
           healthRecordsData,
           aiInsightsData,
@@ -48,11 +58,11 @@ const PatientDashboard = () => {
           activityData,
           alertsData
         ] = await Promise.all([
-          getHealthRecordSummary(user.id),
-          getAIInsightSummary(user.id),
-          getPatientConsentRequests(profile.id),
-          getRecentActivity(user.id),
-          getHealthAlerts(user.id)
+          getCachedHealthRecords(user.id),
+          getCachedAIInsights(user.id),
+          getCachedConsentRequests(profile.id),
+          getCachedRecentActivity(user.id),
+          getCachedHealthAlerts(user.id)
         ]);
 
         setHealthRecords(healthRecordsData);
@@ -70,11 +80,66 @@ const PatientDashboard = () => {
     loadDashboardData();
   }, [user?.id]);
 
+  // Cached data fetching functions
+  const getCachedHealthRecords = async (userId: string) => {
+    const cacheKey = createCacheKey('health-records', userId);
+    const cached = cacheService.get(cacheKey);
+    if (cached) return cached;
+    
+    const data = await getHealthRecordSummary(userId);
+    cacheService.set(cacheKey, data, CACHE_TTL.MEDIUM);
+    return data;
+  };
+
+  const getCachedAIInsights = async (userId: string) => {
+    const cacheKey = createCacheKey('ai-insights', userId);
+    const cached = cacheService.get(cacheKey);
+    if (cached) return cached;
+    
+    const data = await getAIInsightSummary(userId);
+    cacheService.set(cacheKey, data, CACHE_TTL.MEDIUM);
+    return data;
+  };
+
+  const getCachedConsentRequests = async (profileId: string) => {
+    const cacheKey = createCacheKey('consent-requests', profileId);
+    const cached = cacheService.get(cacheKey);
+    if (cached) return cached;
+    
+    const data = await getPatientConsentRequests(profileId);
+    cacheService.set(cacheKey, data, CACHE_TTL.MEDIUM);
+    return data;
+  };
+
+  const getCachedRecentActivity = async (userId: string) => {
+    const cacheKey = createCacheKey('recent-activity', userId);
+    const cached = cacheService.get(cacheKey);
+    if (cached) return cached;
+    
+    const data = await getRecentActivity(userId);
+    cacheService.set(cacheKey, data, CACHE_TTL.SHORT);
+    return data;
+  };
+
+  const getCachedHealthAlerts = async (userId: string) => {
+    const cacheKey = createCacheKey('health-alerts', userId);
+    const cached = cacheService.get(cacheKey);
+    if (cached) return cached;
+    
+    const data = await getHealthAlerts(userId);
+    cacheService.set(cacheKey, data, CACHE_TTL.SHORT);
+    return data;
+  };
+
   const quickStats = [
     { label: 'Health Records', value: healthRecords.totalRecords.toString(), icon: FileText, href: '/records' },
     { label: 'AI Insights', value: aiInsights.totalInsights.toString(), icon: Brain, href: '/ai-insights' },
     { label: 'Active Consents', value: activeConsents.toString(), icon: Shield, href: '/consents' },
   ];
+
+  if (loading) {
+    return <PageSkeleton />;
+  }
 
   return (
     <div className="space-y-6">
@@ -126,10 +191,7 @@ const PatientDashboard = () => {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
                     {loading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-6 w-6 animate-spin" />
-                        <span className="text-lg">Loading...</span>
-                      </div>
+                      <InlineLoadingSpinner text="Loading..." className="text-lg" />
                     ) : (
                       <p className="text-3xl font-bold">{stat.value}</p>
                     )}
@@ -187,10 +249,7 @@ const PatientDashboard = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="ml-2">Loading activity...</span>
-              </div>
+              <CardLoadingSpinner text="Loading activity..." />
             ) : recentActivity.length > 0 ? (
               <div className="space-y-4">
                 {recentActivity.map((activity, index) => (
@@ -223,10 +282,7 @@ const PatientDashboard = () => {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Loading health summary...</span>
-            </div>
+            <CardLoadingSpinner text="Loading health summary..." />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="text-center p-4 bg-accent-light rounded-lg">

@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getPatientRecordsForDoctor, PatientRecord } from '@/services/patientRecordsService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 
 const PatientRecords = () => {
   const { user } = useAuth();
@@ -515,13 +516,6 @@ const PatientRecords = () => {
               </div>
             )}
 
-            {/* Debug info */}
-            <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-              <label className="text-sm font-medium text-gray-500">Debug Info</label>
-              <pre className="text-xs mt-1 overflow-auto max-h-32">
-                {JSON.stringify(viewingDetails, null, 2)}
-              </pre>
-            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -554,10 +548,7 @@ const PatientRecords = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading patient records...</p>
-          </div>
+          <PageLoadingSpinner text="Loading patient records..." />
         </div>
       </div>
     );
@@ -580,32 +571,6 @@ const PatientRecords = () => {
       {/* Details Viewer Modal */}
       <DetailsViewer />
 
-      {/* Debug Info */}
-      {process.env.NODE_ENV === 'development' && (
-        <Card className="bg-yellow-50 border-yellow-200">
-          <CardHeader>
-            <CardTitle className="text-yellow-800">Debug Info</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm space-y-2">
-              <p><strong>Total Records:</strong> {records.length}</p>
-              <p><strong>Filtered Records:</strong> {filteredRecords.length}</p>
-              <p><strong>Health Records:</strong> {healthRecords.length}</p>
-              <p><strong>Prescriptions:</strong> {prescriptions.length}</p>
-              <p><strong>Consultation Notes:</strong> {consultationNotes.length}</p>
-              <p><strong>Unique Patients:</strong> {uniquePatients.length}</p>
-              {records.length > 0 && (
-                <div>
-                  <p><strong>Sample Record:</strong></p>
-                  <pre className="text-xs bg-white p-2 rounded border">
-                    {JSON.stringify(records[0], null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Filters */}
       <div className="flex gap-4">

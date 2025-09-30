@@ -12,6 +12,7 @@ import { Calendar as CalendarIcon, Clock, User, Stethoscope, CheckCircle } from 
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { ButtonLoadingSpinner } from '@/components/ui/loading-spinner';
 import ConsultationConsentRequest from '@/components/consent/ConsultationConsentRequest';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -356,7 +357,7 @@ const ConsultationBooking: React.FC<ConsultationBookingProps> = ({ onBookingComp
           >
             {isLoading ? (
               <>
-                <Clock className="h-4 w-4 mr-2 animate-spin" />
+                <ButtonLoadingSpinner />
                 Booking...
               </>
             ) : (

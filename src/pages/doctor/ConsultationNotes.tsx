@@ -15,6 +15,7 @@ import { getPatientsForDoctor } from '@/services/consentService';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 
 const ConsultationNotes = () => {
   const { user } = useAuth();
@@ -96,7 +97,6 @@ const ConsultationNotes = () => {
   const handleCreateNote = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      
       // First get the doctor's profile ID
       const { data: doctorProfile, error: profileError } = await supabase
         .from('profiles')
@@ -108,13 +108,11 @@ const ConsultationNotes = () => {
         throw new Error('Doctor profile not found');
       }
 
-
       const noteData = {
         ...formData,
         doctor_id: doctorProfile.id,
         follow_up_date: formData.follow_up_required ? formData.follow_up_date : undefined,
       };
-
 
       await createConsultationNote(noteData);
       
@@ -260,9 +258,15 @@ const ConsultationNotes = () => {
     selectedPatient === 'all' || note.patient_id === selectedPatient
   );
 
-  const uniquePatients = Array.from(
-    new Set(notes.map(n => ({ id: n.patient_id, name: n.profiles?.full_name || 'Unknown Patient' })))
-  );
+  // Get unique patients from consultation notes
+  const uniquePatientIds = Array.from(new Set(notes.map(n => n.patient_id)));
+  const uniquePatients = uniquePatientIds.map(patientId => {
+    const note = notes.find(n => n.patient_id === patientId);
+    return {
+      id: patientId,
+      name: note?.profiles?.full_name || 'Unknown Patient'
+    };
+  });
 
   if (loading) {
     return (
@@ -276,10 +280,7 @@ const ConsultationNotes = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading consultation notes...</p>
-          </div>
+          <PageLoadingSpinner text="Loading consultation notes..." />
         </div>
       </div>
     );

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Brain, Activity, AlertTriangle, Lightbulb, TrendingUp, Heart, Zap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { InlineLoadingSpinner } from '@/components/ui/loading-spinner';
 import { HealthRecord, AIAnalysis, RecordType } from '@/types';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -523,7 +524,7 @@ export const AIInsights = () => {
           {isAnalyzing && (
             <div className="bg-blue-50 p-4 rounded-lg border">
               <div className="flex items-center gap-3">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                <InlineLoadingSpinner />
                 <div>
                   <p className="font-medium">AI Analysis in Progress</p>
                   <p className="text-sm text-muted-foreground">

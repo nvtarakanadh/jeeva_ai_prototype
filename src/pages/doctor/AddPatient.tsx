@@ -45,8 +45,6 @@ const AddPatient = () => {
     setIsSearching(true);
     
     try {
-      console.log('🔍 Searching for patients with query:', searchQuery);
-      
       // Search in profiles table for users with role 'patient'
       const { data: profiles, error } = await supabase
         .from('profiles')
@@ -64,8 +62,6 @@ const AddPatient = () => {
         setSearchResults([]);
         return;
       }
-
-      console.log('📊 Search results:', profiles);
 
       if (profiles && profiles.length > 0) {
         // Convert profiles to search result format

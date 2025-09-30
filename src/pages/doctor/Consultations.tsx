@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar, Clock, User, Stethoscope, CheckCircle, XCircle, AlertCircle, Eye, PlusCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { PageLoadingSpinner } from '@/components/ui/loading-spinner';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDoctorConsultations, Consultation } from '@/services/consultationService';
 import { getPatientRecordsForDoctor } from '@/services/patientRecordsService';
@@ -148,10 +149,7 @@ const DoctorConsultations = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading consultations...</p>
-          </div>
+          <PageLoadingSpinner text="Loading consultations..." />
         </div>
       </div>
     );

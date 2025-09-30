@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { createConsultationNoteNotification, createConsultationBookedNotification } from './notificationService';
 
 export interface Consultation {
   id: string;
@@ -52,6 +53,24 @@ export const createConsultation = async (bookingData: ConsultationBookingData): 
       .single();
 
     if (error) throw error;
+
+    // Get doctor user_id for notification
+    const { data: doctorUser, error: doctorUserError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', bookingData.doctor_id)
+      .single();
+
+    // Create notification for doctor about new consultation booking
+    if (doctorUser && !doctorUserError) {
+      await createConsultationBookedNotification(
+        doctorUser.user_id,
+        bookingData.doctor_id,
+        data.patient?.full_name || 'Patient',
+        bookingData.consultation_date
+      );
+    }
+
     return data;
   } catch (error) {
     console.error('Error creating consultation:', error);

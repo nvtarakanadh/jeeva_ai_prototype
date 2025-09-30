@@ -9,6 +9,7 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, FileText, X, Stethoscope, Calendar, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { ButtonLoadingSpinner } from '@/components/ui/loading-spinner';
 import { createConsultationNote, uploadConsultationNoteFile } from '@/services/prescriptionService';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -301,12 +302,12 @@ const CreateConsultationNote: React.FC<CreateConsultationNoteProps> = ({
               </Button>
             )}
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Creating...
-                </>
-              ) : (
+            {isSubmitting ? (
+              <>
+                <ButtonLoadingSpinner className="text-white" />
+                Creating...
+              </>
+            ) : (
                 <>
                   <Stethoscope className="h-4 w-4 mr-2" />
                   Create Note

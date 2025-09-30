@@ -10,11 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pill, Plus, Calendar, User, FileText, Download, Edit, Trash2, Eye, Stethoscope, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getPrescriptionsForDoctor, createPrescription, Prescription } from '@/services/prescriptionService';
-import { getPatientsForDoctor } from '@/services/consentService';
+import { createPrescription, Prescription } from '@/services/prescriptionService';
+import { getOptimizedPrescriptionsForDoctor, getOptimizedPatientsForDoctor, clearPrescriptionCache } from '@/services/optimizedPrescriptionService';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
+import { PageSkeleton } from '@/components/ui/skeleton-loading';
 
 const Prescriptions = () => {
   const { user } = useAuth();
@@ -41,17 +42,53 @@ const Prescriptions = () => {
   });
 
   useEffect(() => {
-    if (user) {
-      loadPrescriptions();
-      loadPatients();
-    }
+    const loadAllData = async () => {
+      if (!user) return;
+      
+      try {
+        setLoading(true);
+        
+        // Get doctor profile once
+        const { data: doctorProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (profileError || !doctorProfile) {
+          throw new Error('Doctor profile not found');
+        }
+
+        // Load both prescriptions and patients in parallel
+        const [prescriptionsData, patientsData] = await Promise.all([
+          getOptimizedPrescriptionsForDoctor(doctorProfile.id),
+          getOptimizedPatientsForDoctor(doctorProfile.id)
+        ]);
+
+        setPrescriptions(prescriptionsData as Prescription[]);
+        setPatients(patientsData as any[]);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load prescriptions data",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAllData();
   }, [user]);
 
-  const loadPrescriptions = async () => {
+  const refreshData = async () => {
+    if (!user) return;
+    
     try {
       setLoading(true);
       
-      // First get the doctor's profile ID
+      // Get doctor profile once
       const { data: doctorProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
@@ -62,35 +99,26 @@ const Prescriptions = () => {
         throw new Error('Doctor profile not found');
       }
 
-      const data = await getPrescriptionsForDoctor(doctorProfile.id);
-      setPrescriptions(data);
+      // Clear cache and reload data
+      clearPrescriptionCache(doctorProfile.id);
+      
+      // Load both prescriptions and patients in parallel
+      const [prescriptionsData, patientsData] = await Promise.all([
+        getOptimizedPrescriptionsForDoctor(doctorProfile.id),
+        getOptimizedPatientsForDoctor(doctorProfile.id)
+      ]);
+
+      setPrescriptions(prescriptionsData as Prescription[]);
+      setPatients(patientsData as any[]);
     } catch (error) {
+      console.error('Error refreshing data:', error);
       toast({
         title: "Error",
-        description: "Failed to load prescriptions",
+        description: "Failed to refresh data",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadPatients = async () => {
-    try {
-      // First get the doctor's profile ID
-      const { data: doctorProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (profileError || !doctorProfile) {
-        throw new Error('Doctor profile not found');
-      }
-
-      const data = await getPatientsForDoctor(doctorProfile.id);
-      setPatients(data);
-    } catch (error) {
     }
   };
 
@@ -136,7 +164,7 @@ const Prescriptions = () => {
         prescription_date: new Date().toISOString().split('T')[0],
       });
       
-      loadPrescriptions();
+      refreshData();
     } catch (error) {
       toast({
         title: "Error",
@@ -225,7 +253,7 @@ const Prescriptions = () => {
         prescription_date: new Date().toISOString().split('T')[0],
       });
       
-      loadPrescriptions();
+      refreshData();
     } catch (error) {
       toast({
         title: "Error",
@@ -249,7 +277,7 @@ const Prescriptions = () => {
         description: "Prescription deleted successfully",
       });
 
-      loadPrescriptions();
+      refreshData();
     } catch (error) {
       toast({
         title: "Error",
@@ -263,9 +291,15 @@ const Prescriptions = () => {
     selectedPatient === 'all' || prescription.patient_id === selectedPatient
   );
 
-  const uniquePatients = Array.from(
-    new Set(prescriptions.map(p => ({ id: p.patient_id, name: p.profiles?.full_name || 'Unknown Patient' })))
-  );
+  // Get unique patients from prescriptions
+  const uniquePatientIds = Array.from(new Set(prescriptions.map(p => p.patient_id)));
+  const uniquePatients = uniquePatientIds.map(patientId => {
+    const prescription = prescriptions.find(p => p.patient_id === patientId);
+    return {
+      id: patientId,
+      name: prescription?.profiles?.full_name || 'Unknown Patient'
+    };
+  });
 
   if (loading) {
     return (
@@ -279,10 +313,7 @@ const Prescriptions = () => {
           </div>
         </div>
         <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-            <p className="mt-2 text-muted-foreground">Loading prescriptions...</p>
-          </div>
+          <PageSkeleton />
         </div>
       </div>
     );

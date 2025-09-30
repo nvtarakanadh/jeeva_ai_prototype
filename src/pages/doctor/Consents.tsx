@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConsentRequest, ConsentStatus, RecordType } from '@/types';
 import { format } from 'date-fns';
+import { CardLoadingSpinner, ButtonLoadingSpinner } from '@/components/ui/loading-spinner';
 import { Shield, Clock, CheckCircle, XCircle, User, Calendar, Send, Search, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDoctorConsentRequests, extendConsentRequest } from '@/services/consentService';
@@ -162,7 +163,7 @@ const DoctorConsents = () => {
             onClick={loadConsentRequests}
             disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? <ButtonLoadingSpinner /> : <RefreshCw className="h-4 w-4 mr-2" />}
             Refresh
           </Button>
           {doctorProfileId && (
@@ -256,8 +257,7 @@ const DoctorConsents = () => {
         {loading ? (
           <Card>
             <CardContent className="text-center py-12">
-              <RefreshCw className="h-12 w-12 mx-auto mb-4 text-muted-foreground animate-spin" />
-              <p className="text-lg font-medium">Loading consent requests...</p>
+              <CardLoadingSpinner text="Loading consent requests..." />
             </CardContent>
           </Card>
         ) : filteredRequests.length === 0 ? (

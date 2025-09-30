@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { createPrescriptionNotification, createConsultationNoteNotification } from './notificationService';
 
 export interface Prescription {
   id: string;
@@ -71,6 +72,24 @@ export const createPrescription = async (prescriptionData: {
       .single();
 
     if (error) throw error;
+
+    // Get patient user_id for notification
+    const { data: patientUser, error: patientUserError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', prescriptionData.patient_id)
+      .single();
+
+    // Create notification for patient about new prescription
+    if (patientUser && !patientUserError) {
+      await createPrescriptionNotification(
+        patientUser.user_id,
+        prescriptionData.patient_id,
+        data.profiles?.full_name || 'Doctor',
+        prescriptionData.title
+      );
+    }
+
     return {
       ...data,
       profiles: {
@@ -120,6 +139,8 @@ export const createConsultationNote = async (noteData: {
   file_name?: string;
 }): Promise<ConsultationNote> => {
   try {
+    console.log('📝 Creating consultation note with data:', noteData);
+    
     const { data, error } = await supabase
       .from('consultation_notes')
       .insert([noteData])
@@ -132,7 +153,48 @@ export const createConsultationNote = async (noteData: {
       `)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('❌ Error creating consultation note:', error);
+      throw error;
+    }
+    
+    console.log('✅ Consultation note created successfully:', data.id);
+
+    // Get patient user_id for notification
+    console.log('🔍 Looking up patient user for notification...');
+    console.log('Patient ID:', noteData.patient_id);
+    
+    const { data: patientUser, error: patientUserError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', noteData.patient_id)
+      .single();
+
+    console.log('Patient user lookup result:', { patientUser, patientUserError });
+
+    // Create notification for patient about new consultation note
+    if (patientUser && !patientUserError) {
+      console.log('✅ Patient user found, creating notification...');
+      console.log('Creating consultation note notification:', {
+        patientUserId: patientUser.user_id,
+        patientProfileId: noteData.patient_id,
+        doctorName: data.profiles?.full_name || 'Doctor',
+        noteTitle: noteData.title
+      });
+      
+      const notificationId = await createConsultationNoteNotification(
+        patientUser.user_id,
+        noteData.patient_id,
+        data.profiles?.full_name || 'Doctor',
+        noteData.title
+      );
+      
+      console.log('Consultation note notification created:', notificationId);
+    } else {
+      console.error('❌ Failed to get patient user for notification:', patientUserError);
+      console.error('Patient user data:', patientUser);
+    }
+
     return {
       ...data,
       profiles: {

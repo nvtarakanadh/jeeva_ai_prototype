@@ -1,5 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ConsentRequest, ConsentStatus, RecordType } from '@/types';
+import { 
+  createConsentRequestNotification,
+  createConsentApprovedNotification,
+  createConsentDeniedNotification,
+  createRecordAccessNotification
+} from './notificationService';
 
 export interface ConsentRequestData {
   patientId: string;
@@ -181,6 +187,22 @@ export const createConsentRequest = async (requestData: ConsentRequestData): Pro
     // Get doctor name from profiles table
     const doctorName = await getDoctorName(data.doctor_id);
 
+    // Get patient user_id for notification
+    const { data: patientUser, error: patientUserError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', data.patient_id)
+      .single();
+
+    // Create notification for patient about consent request
+    if (patientUser && !patientUserError) {
+      await createConsentRequestNotification(
+        patientUser.user_id,
+        data.patient_id,
+        doctorName
+      );
+    }
+
     return {
       id: data.id,
       patientId: data.patient_id,
@@ -281,6 +303,47 @@ export const respondToConsentRequest = async (
     }
 
     const doctorName = await getDoctorName(data.doctor_id);
+
+    // Get patient and doctor user_ids for notifications
+    const { data: patientUser, error: patientUserError } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .eq('id', data.patient_id)
+      .single();
+
+    const { data: doctorUser, error: doctorUserError } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('id', data.doctor_id)
+      .single();
+
+    // Create notifications based on response
+    if (response.status === 'approved') {
+      // Notify doctor about approval
+      if (doctorUser && !doctorUserError) {
+        await createConsentApprovedNotification(
+          doctorUser.user_id,
+          data.doctor_id,
+          patientUser?.full_name || 'Patient'
+        );
+        
+        await createRecordAccessNotification(
+          doctorUser.user_id,
+          data.doctor_id,
+          patientUser?.full_name || 'Patient',
+          'granted'
+        );
+      }
+    } else if (response.status === 'denied') {
+      // Notify doctor about denial
+      if (doctorUser && !doctorUserError) {
+        await createConsentDeniedNotification(
+          doctorUser.user_id,
+          data.doctor_id,
+          patientUser?.full_name || 'Patient'
+        );
+      }
+    }
 
     return {
       id: data.id,
