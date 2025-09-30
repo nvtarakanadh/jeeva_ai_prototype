@@ -9,6 +9,7 @@ import { Shield, Clock, CheckCircle, XCircle, AlertCircle, User, Calendar, Refre
 import { toast } from '@/hooks/use-toast';
 import { getPatientConsentRequests, respondToConsentRequest, revokeConsentRequest } from '@/services/consentService';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const ConsentManagement = () => {
   const { user } = useAuth();
@@ -16,18 +17,49 @@ const ConsentManagement = () => {
   const [selectedDataTypes, setSelectedDataTypes] = useState<RecordType[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [patientProfileId, setPatientProfileId] = useState<string | null>(null);
 
-  // Load consent requests on component mount
+  // Load patient profile ID first, then consent requests
   useEffect(() => {
     if (user?.id) {
-      loadConsentRequests();
+      loadPatientProfile();
     }
   }, [user?.id]);
 
+  const loadPatientProfile = async () => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user!.id)
+        .eq('role', 'patient')
+        .single();
+
+      if (error) throw error;
+      setPatientProfileId(profile.id);
+    } catch (error) {
+      console.error('Error loading patient profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load patient profile",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Load consent requests when profile ID is available
+  useEffect(() => {
+    if (patientProfileId) {
+      loadConsentRequests();
+    }
+  }, [patientProfileId]);
+
   const loadConsentRequests = async () => {
+    if (!patientProfileId) return;
+    
     try {
       setLoading(true);
-      const requests = await getPatientConsentRequests(user!.id);
+      const requests = await getPatientConsentRequests(patientProfileId);
       setConsentRequests(requests);
     } catch (error) {
       console.error('Error loading consent requests:', error);

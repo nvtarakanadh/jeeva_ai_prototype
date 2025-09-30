@@ -143,18 +143,27 @@ const CreateConsentRequest: React.FC<CreateConsentRequestProps> = ({ doctorId, o
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="patient">Select Patient *</Label>
-            <Select value={selectedPatient} onValueChange={setSelectedPatient} disabled={loading}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a patient" />
-              </SelectTrigger>
-              <SelectContent>
-                {patients.map((patient) => (
-                  <SelectItem key={patient.id} value={patient.id}>
-                    {patient.name} ({patient.email})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {patients.length === 0 ? (
+              <div className="p-4 border border-dashed border-muted-foreground rounded-lg text-center">
+                <p className="text-muted-foreground">No patients found in the database.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Please ensure patient profiles exist before creating consent requests.
+                </p>
+              </div>
+            ) : (
+              <Select value={selectedPatient} onValueChange={setSelectedPatient} disabled={loading}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a patient" />
+                </SelectTrigger>
+                <SelectContent>
+                  {patients.map((patient) => (
+                    <SelectItem key={patient.id} value={patient.id}>
+                      {patient.name} ({patient.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="space-y-2">

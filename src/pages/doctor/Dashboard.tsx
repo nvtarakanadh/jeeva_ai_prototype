@@ -1,132 +1,111 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Users, Clock, CheckCircle, FileText, PlusCircle, Activity } from 'lucide-react';
+import { Users, Clock, CheckCircle, FileText, PlusCircle, Activity, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { getPatientRecordsForDoctor } from '@/services/patientRecordsService';
-import { getPatientConsentRequests } from '@/services/consentService';
 import { supabase } from '@/integrations/supabase/client';
+import { getDashboardStats, getRecentActivity, getUpcomingTasks, type DashboardStats, type RecentActivity, type UpcomingTask } from '@/services/dashboardService';
 
 const DoctorDashboard = () => {
-  console.log('🔍 DoctorDashboard component rendered');
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<DashboardStats>({
     totalPatients: 0,
     pendingConsents: 0,
     activeConsents: 0,
     totalRecords: 0
   });
-  const [loading, setLoading] = useState(false);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<UpcomingTask[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [doctorProfileId, setDoctorProfileId] = useState<string | null>(null);
 
+  // Get doctor profile ID once
   useEffect(() => {
-    console.log('🔍 Dashboard useEffect triggered with user:', user);
-    if (user) {
-      console.log('🔍 Dashboard: User exists, calling loadDashboardData');
-      loadDashboardData();
-    } else {
-      console.log('🔍 Dashboard: No user, skipping loadDashboardData');
-    }
+    const getDoctorProfileId = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: doctorProfile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error || !doctorProfile) {
+          console.error('Error finding doctor profile:', error);
+          setLoading(false);
+          return;
+        }
+
+        setDoctorProfileId(doctorProfile.id);
+      } catch (error) {
+        console.error('Error getting doctor profile:', error);
+        setLoading(false);
+      }
+    };
+
+    getDoctorProfileId();
   }, [user]);
 
-  const loadDashboardData = async () => {
-    console.log('🔍 loadDashboardData called with user:', user);
-    try {
-      setLoading(true);
-      
-      // Get the doctor's profile ID first
-      const { data: doctorProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+  // Load dashboard data when profile ID is available
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!doctorProfileId) return;
 
-      if (profileError || !doctorProfile) {
-        console.error('Error finding doctor profile:', profileError);
-        setStats({
-          totalPatients: 0,
-          pendingConsents: 0,
-          activeConsents: 0,
-          totalRecords: 0
-        });
-        return;
+      try {
+        setLoading(true);
+        
+        // Load all data in parallel for better performance
+        const [statsData, activityData, tasksData] = await Promise.all([
+          getDashboardStats(doctorProfileId),
+          getRecentActivity(doctorProfileId),
+          getUpcomingTasks(doctorProfileId)
+        ]);
+
+        setStats(statsData);
+        setRecentActivity(activityData);
+        setUpcomingTasks(tasksData);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Load patient records to get total count using profile ID
-      console.log('🔍 Dashboard: Loading records for doctor profile ID:', doctorProfile.id);
-      const records = await getPatientRecordsForDoctor(doctorProfile.id);
-      console.log('📋 Dashboard: Found records:', records.length);
-      
-      // Load consent requests using auth user ID
-      const consentRequests = await getPatientConsentRequests(user.id);
-      console.log('📋 Dashboard: Found consent requests:', consentRequests.length);
-      
-      // Get unique patients from patient_access table (not just from records)
-      const { data: patientAccess, error: accessError } = await supabase
-        .from('patient_access')
-        .select('patient_id')
-        .eq('doctor_id', doctorProfile.id)
-        .eq('status', 'active');
-      
-      const uniquePatients = new Set(patientAccess?.map(acc => acc.patient_id) || []).size;
-      console.log('📋 Dashboard: Found unique patients from access table:', uniquePatients);
-      
-      const pendingConsents = consentRequests.filter(c => c.status === 'pending').length;
-      const activeConsents = consentRequests.filter(c => c.status === 'approved').length;
-      
-      console.log('📊 Dashboard: Calculated stats:', {
-        totalPatients: uniquePatients,
-        pendingConsents,
-        activeConsents,
-        totalRecords: records.length
-      });
-      
-      setStats({
-        totalPatients: uniquePatients,
-        pendingConsents,
-        activeConsents,
-        totalRecords: records.length
-      });
-    } catch (error) {
-      console.error('Error loading dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    loadDashboardData();
+  }, [doctorProfileId]);
 
-  const quickStats = [
+  // Memoize quick stats to prevent unnecessary re-renders
+  const quickStats = useMemo(() => [
     { label: 'Total Patients', value: stats.totalPatients.toString(), icon: Users, href: '/doctor/patients' },
     { label: 'Pending Consents', value: stats.pendingConsents.toString(), icon: Clock, href: '/doctor/consents' },
     { label: 'Active Consents', value: stats.activeConsents.toString(), icon: CheckCircle, href: '/doctor/consents' },
     { label: 'Total Records', value: stats.totalRecords.toString(), icon: FileText, href: '/doctor/patient-records' },
-  ];
+  ], [stats]);
 
-  console.log('🔍 Dashboard: Current stats state:', stats);
-  console.log('🔍 Dashboard: Quick stats values:', quickStats.map(s => `${s.label}: ${s.value}`));
-
-  const recentActivity = [
-    { type: 'consent', message: 'New consent request approved by John Doe', time: '2 hours ago' },
-    { type: 'prescription', message: 'Prescription uploaded for Sarah Smith', time: '4 hours ago' },
-    { type: 'patient', message: 'New patient added to your care', time: '1 day ago' },
-  ];
-
-  const upcomingTasks = [
-    { task: 'Review blood test results for John Doe', priority: 'high', dueDate: new Date() },
-    { task: 'Follow up with Sarah Smith on medication', priority: 'medium', dueDate: new Date(Date.now() + 86400000) },
-    { task: 'Prepare consultation notes', priority: 'low', dueDate: new Date(Date.now() + 172800000) },
-  ];
-
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: 'high' | 'medium' | 'low') => {
     const colors = {
       high: 'bg-destructive',
       medium: 'bg-warning',
       low: 'bg-accent'
     };
-    return colors[priority as keyof typeof colors] || colors.low;
+    return colors[priority] || colors.low;
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -204,17 +183,24 @@ const DoctorDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity, index) => (
-                <div key={index} className="flex items-center gap-3 pb-3 border-b border-border last:border-0">
-                  <div className="p-2 bg-accent-light rounded-lg">
-                    <Activity className="h-4 w-4 text-accent" />
+              {recentActivity.length > 0 ? (
+                recentActivity.map((activity) => (
+                  <div key={activity.id} className="flex items-center gap-3 pb-3 border-b border-border last:border-0">
+                    <div className="p-2 bg-accent-light rounded-lg">
+                      <Activity className="h-4 w-4 text-accent" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{activity.message}</p>
+                      <p className="text-xs text-muted-foreground">{activity.time}</p>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.message}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No recent activity</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
@@ -228,22 +214,30 @@ const DoctorDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {upcomingTasks.map((task, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">{task.task}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Due: {format(task.dueDate, 'MMM dd, yyyy')}
-                    </p>
+            {upcomingTasks.length > 0 ? (
+              upcomingTasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">{task.task}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Due: {format(new Date(task.dueDate), 'MMM dd, yyyy')}
+                        {task.patientName && ` • ${task.patientName}`}
+                      </p>
+                    </div>
                   </div>
+                  <Badge className={`${getPriorityColor(task.priority)} text-white`}>
+                    {task.priority}
+                  </Badge>
                 </div>
-                <Badge className={`${getPriorityColor(task.priority)} text-white`}>
-                  {task.priority}
-                </Badge>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No upcoming tasks</p>
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>

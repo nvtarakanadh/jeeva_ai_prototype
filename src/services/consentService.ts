@@ -16,23 +16,23 @@ export interface ConsentResponseData {
 }
 
 // Helper function to get doctor name
-const getDoctorName = async (doctorId: string): Promise<string> => {
+const getDoctorName = async (doctorProfileId: string): Promise<string> => {
   const { data: doctorProfile } = await supabase
     .from('profiles')
     .select('full_name')
-    .eq('user_id', doctorId)
+    .eq('id', doctorProfileId)
     .single();
   
   return doctorProfile?.full_name || 'Unknown Doctor';
 };
 
 // Get consent requests for a doctor
-export const getDoctorConsentRequests = async (doctorId: string): Promise<ConsentRequest[]> => {
+export const getDoctorConsentRequests = async (doctorProfileId: string): Promise<ConsentRequest[]> => {
   try {
     const { data, error } = await supabase
       .from('consent_requests')
       .select('*')
-      .eq('doctor_id', doctorId)
+      .eq('doctor_id', doctorProfileId)
       .order('requested_at', { ascending: false });
 
     if (error) throw error;
@@ -41,10 +41,10 @@ export const getDoctorConsentRequests = async (doctorId: string): Promise<Consen
     const doctorIds = [...new Set(data.map(r => r.doctor_id))];
     const { data: doctorProfiles } = await supabase
       .from('profiles')
-      .select('user_id, full_name')
-      .in('user_id', doctorIds);
+      .select('id, full_name')
+      .in('id', doctorIds);
 
-    const doctorMap = new Map(doctorProfiles?.map(p => [p.user_id, p.full_name]) || []);
+    const doctorMap = new Map(doctorProfiles?.map(p => [p.id, p.full_name]) || []);
 
     return data.map(request => ({
       id: request.id,
@@ -81,10 +81,10 @@ export const getPatientConsentRequests = async (patientId: string): Promise<Cons
     const doctorIds = [...new Set(data.map(r => r.doctor_id))];
     const { data: doctorProfiles } = await supabase
       .from('profiles')
-      .select('user_id, full_name')
-      .in('user_id', doctorIds);
+      .select('id, full_name')
+      .in('id', doctorIds);
 
-    const doctorMap = new Map(doctorProfiles?.map(p => [p.user_id, p.full_name]) || []);
+    const doctorMap = new Map(doctorProfiles?.map(p => [p.id, p.full_name]) || []);
 
     return data.map(request => ({
       id: request.id,
@@ -118,6 +118,34 @@ export const createConsentRequest = async (requestData: ConsentRequestData): Pro
     }
     
     console.log('User authenticated:', user.id);
+    
+    // First, verify that the patient_id exists in profiles table
+    const { data: patientProfile, error: patientError } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', requestData.patientId)
+      .single();
+    
+    if (patientError || !patientProfile) {
+      console.error('Patient profile not found:', patientError);
+      throw new Error(`Patient not found: ${requestData.patientId}`);
+    }
+    
+    console.log('Patient profile verified:', patientProfile);
+    
+    // Verify that the doctor_id exists in profiles table
+    const { data: doctorProfile, error: doctorError } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', requestData.doctorId)
+      .single();
+    
+    if (doctorError || !doctorProfile) {
+      console.error('Doctor profile not found:', doctorError);
+      throw new Error(`Doctor not found: ${requestData.doctorId}`);
+    }
+    
+    console.log('Doctor profile verified:', doctorProfile);
     
     // Insert consent request with all required fields
     const insertData = {
@@ -395,10 +423,22 @@ export const extendConsentRequest = async (requestId: string, additionalDays: nu
 // Get patients for a doctor (for creating consent requests)
 export const getPatientsForDoctor = async (doctorId: string) => {
   try {
+    console.log('Getting patients for doctor profile ID:', doctorId);
+    
+    // First, let's check what profiles exist
+    const { data: allProfiles, error: allProfilesError } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, role')
+      .order('role, full_name');
+    
+    console.log('All profiles in database:', allProfiles);
+    
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, role')
       .eq('role', 'patient')
+      .not('id', 'is', null)
+      .not('full_name', 'is', null)
       .order('full_name');
 
     if (error) {
@@ -406,12 +446,20 @@ export const getPatientsForDoctor = async (doctorId: string) => {
       throw error;
     }
 
+    console.log('Found patients:', data);
+
+    if (!data || data.length === 0) {
+      console.warn('No patients found in database');
+      return [];
+    }
+
     const patients = data.map(patient => ({
-      id: patient.id, // FIXED: Use profile ID instead of user_id
-      name: patient.full_name,
-      email: patient.email
+      id: patient.id,
+      name: patient.full_name || 'Unknown Patient',
+      email: patient.email || 'No email'
     }));
 
+    console.log('Processed patients:', patients);
     return patients;
   } catch (error) {
     console.error('Error fetching patients for doctor:', error);

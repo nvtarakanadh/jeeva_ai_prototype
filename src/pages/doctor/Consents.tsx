@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { getDoctorConsentRequests, extendConsentRequest } from '@/services/consentService';
 import CreateConsentRequest from '@/components/consent/CreateConsentRequest';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 
 const DoctorConsents = () => {
@@ -19,18 +20,47 @@ const DoctorConsents = () => {
   const [filterStatus, setFilterStatus] = useState<ConsentStatus | 'all'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [doctorProfileId, setDoctorProfileId] = useState<string | null>(null);
 
-  // Load consent requests on component mount
+  // Get doctor profile ID first
   useEffect(() => {
-    if (user?.id) {
+    const getDoctorProfileId = async () => {
+      if (!user) return;
+      
+      try {
+        const { data: doctorProfile, error } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (error || !doctorProfile) {
+          console.error('Error finding doctor profile:', error);
+          return;
+        }
+
+        setDoctorProfileId(doctorProfile.id);
+      } catch (error) {
+        console.error('Error getting doctor profile:', error);
+      }
+    };
+
+    getDoctorProfileId();
+  }, [user]);
+
+  // Load consent requests when profile ID is available
+  useEffect(() => {
+    if (doctorProfileId) {
       loadConsentRequests();
     }
-  }, [user?.id]);
+  }, [doctorProfileId]);
 
   const loadConsentRequests = async () => {
+    if (!doctorProfileId) return;
+    
     try {
       setLoading(true);
-      const requests = await getDoctorConsentRequests(user!.id);
+      const requests = await getDoctorConsentRequests(doctorProfileId);
       setConsentRequests(requests);
     } catch (error) {
       console.error('Error loading consent requests:', error);
@@ -135,9 +165,9 @@ const DoctorConsents = () => {
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          {user?.id && (
+          {doctorProfileId && (
             <CreateConsentRequest
-              doctorId={user.id}
+              doctorId={doctorProfileId}
               onRequestCreated={loadConsentRequests}
             />
           )}

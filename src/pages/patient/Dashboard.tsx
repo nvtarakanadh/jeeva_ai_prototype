@@ -10,6 +10,7 @@ import { getAIInsightSummary } from '@/services/aiInsightsService';
 import { getRecentActivity, formatTimeAgo } from '@/services/activityService';
 import { getHealthAlerts } from '@/services/healthAlertsService';
 import { getPatientConsentRequests } from '@/services/consentService';
+import { supabase } from '@/integrations/supabase/client';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
@@ -30,6 +31,16 @@ const PatientDashboard = () => {
         setLoading(true);
         
         // Load all data in parallel
+        // First get patient profile ID
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('role', 'patient')
+          .single();
+
+        if (profileError) throw profileError;
+
         const [
           healthRecordsData,
           aiInsightsData,
@@ -39,7 +50,7 @@ const PatientDashboard = () => {
         ] = await Promise.all([
           getHealthRecordSummary(user.id),
           getAIInsightSummary(user.id),
-          getPatientConsentRequests(user.id),
+          getPatientConsentRequests(profile.id),
           getRecentActivity(user.id),
           getHealthAlerts(user.id)
         ]);
