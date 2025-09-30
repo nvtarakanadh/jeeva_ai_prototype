@@ -18,8 +18,6 @@ import DoctorDashboard from "./pages/doctor/Dashboard";
 import DoctorPatients from "./pages/doctor/Patients";
 import AddPatient from "./pages/doctor/AddPatient";
 import PatientRecords from "./pages/doctor/PatientRecords";
-import SimplePatientRecords from "./pages/doctor/SimplePatientRecords";
-import CleanPatientRecords from "./pages/doctor/CleanPatientRecords";
 import Prescriptions from "./pages/doctor/Prescriptions";
 import ConsultationNotes from "./pages/doctor/ConsultationNotes";
 import DoctorConsents from "./pages/doctor/Consents";
@@ -27,12 +25,6 @@ import DoctorConsultations from "./pages/doctor/Consultations";
 import PatientConsultations from "./pages/patient/Consultations";
 import PatientPrescriptions from "./pages/patient/Prescriptions";
 import PatientConsultationNotes from "./pages/patient/ConsultationNotes";
-import DebugConsent from "./pages/DebugConsent";
-import DebugRecords from "./pages/DebugRecords";
-import SimpleRecordsTest from "./pages/SimpleRecordsTest";
-import TestDataStructure from "./pages/TestDataStructure";
-import TestImageUrl from "./pages/TestImageUrl";
-import TestDashboard from "./pages/TestDashboard";
 import Auth from "./pages/Auth";
 import MainLayout from "./layouts/MainLayout";
 
@@ -67,20 +59,10 @@ const App = () => (
                       <Route path="/doctor/patients" element={<MainLayout><DoctorPatients /></MainLayout>} />
                       <Route path="/doctor/add-patient" element={<MainLayout><AddPatient /></MainLayout>} />
                       <Route path="/doctor/patient-records" element={<MainLayout><PatientRecords /></MainLayout>} />
-                      <Route path="/doctor/simple-records" element={<MainLayout><SimplePatientRecords /></MainLayout>} />
-                      <Route path="/doctor/clean-records" element={<MainLayout><CleanPatientRecords /></MainLayout>} />
                       <Route path="/doctor/prescriptions" element={<MainLayout><Prescriptions /></MainLayout>} />
                       <Route path="/doctor/consultation-notes" element={<MainLayout><ConsultationNotes /></MainLayout>} />
                       <Route path="/doctor/consultations" element={<MainLayout><DoctorConsultations /></MainLayout>} />
                       <Route path="/doctor/consents" element={<MainLayout><DoctorConsents /></MainLayout>} />
-
-                      {/* Debug Routes */}
-                      <Route path="/debug-consent" element={<MainLayout><DebugConsent /></MainLayout>} />
-                      <Route path="/debug-records" element={<MainLayout><DebugRecords /></MainLayout>} />
-                      <Route path="/simple-test" element={<MainLayout><SimpleRecordsTest /></MainLayout>} />
-                      <Route path="/test-data-structure" element={<MainLayout><TestDataStructure /></MainLayout>} />
-                      <Route path="/test-image-url" element={<MainLayout><TestImageUrl /></MainLayout>} />
-                      <Route path="/test-dashboard" element={<MainLayout><TestDashboard /></MainLayout>} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
