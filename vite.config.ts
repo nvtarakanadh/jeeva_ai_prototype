@@ -21,35 +21,34 @@ export default defineConfig({
     // Optimize bundle size
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks: (id) => {
           // Vendor chunks
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'date-fns'],
-          'supabase-vendor': ['@supabase/supabase-js'],
-          // Feature chunks
-          'doctor-pages': [
-            './src/pages/doctor/Dashboard',
-            './src/pages/doctor/Prescriptions',
-            './src/pages/doctor/ConsultationNotes',
-            './src/pages/doctor/PatientRecords',
-            './src/pages/doctor/Consultations',
-            './src/pages/doctor/Patients',
-            './src/pages/doctor/Consents'
-          ],
-          'patient-pages': [
-            './src/pages/patient/Dashboard',
-            './src/pages/patient/ConsultationNotes',
-            './src/pages/patient/Prescriptions',
-            './src/pages/patient/Consultations',
-            './src/pages/patient/PatientAccess',
-            './src/pages/patient/ConsentManagement',
-            './src/pages/patient/AIInsights'
-          ],
-          'components': [
-            './src/components/prescription/CreatePrescription',
-            './src/components/consultation/CreateConsultationNote',
-            './src/components/consultation/ConsultationBooking'
-          ]
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+              return 'react-vendor';
+            }
+            if (id.includes('lucide-react') || id.includes('date-fns')) {
+              return 'ui-vendor';
+            }
+            if (id.includes('@supabase')) {
+              return 'supabase-vendor';
+            }
+            return 'vendor';
+          }
+          
+          // Feature chunks - be more specific to avoid conflicts
+          if (id.includes('src/pages/doctor/')) {
+            return 'doctor-pages';
+          }
+          if (id.includes('src/pages/patient/')) {
+            return 'patient-pages';
+          }
+          if (id.includes('src/components/')) {
+            return 'components';
+          }
+          
+          // Default chunk for other files
+          return undefined;
         }
       }
     },
@@ -65,6 +64,12 @@ export default defineConfig({
         drop_debugger: true,
       },
     },
+    // Target modern browsers for better optimization
+    target: 'esnext',
+    // Ensure consistent chunk naming
+    chunkFileNames: 'assets/[name]-[hash].js',
+    entryFileNames: 'assets/[name]-[hash].js',
+    assetFileNames: 'assets/[name]-[hash].[ext]',
   },
   // Optimize dependencies
   optimizeDeps: {
