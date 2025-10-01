@@ -22,9 +22,13 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: (id) => {
-          // Vendor chunks
+          // Ensure React is always in the main bundle to avoid loading order issues
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) {
+            // Keep React and React-DOM in the main bundle for proper loading order
+            if (id.includes('react') || id.includes('react-dom')) {
+              return undefined; // Keep in main bundle
+            }
+            if (id.includes('react-router')) {
               return 'react-vendor';
             }
             if (id.includes('lucide-react') || id.includes('date-fns')) {
@@ -50,7 +54,11 @@ export default defineConfig({
           // Default chunk for other files
           return undefined;
         }
-      }
+      },
+      // Ensure proper external handling
+      external: [],
+      // Ensure proper chunk loading order
+      preserveEntrySignatures: 'strict'
     },
     // Enable source maps for debugging
     sourcemap: process.env.NODE_ENV === 'development',
@@ -84,5 +92,9 @@ export default defineConfig({
     exclude: [
       // Exclude heavy dependencies that are loaded on demand
     ]
+  },
+  // Ensure proper module resolution
+  esbuild: {
+    jsx: 'automatic'
   }
 });
