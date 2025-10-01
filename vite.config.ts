@@ -18,47 +18,12 @@ export default defineConfig({
     'import.meta.env.VITE_OPENAI_API_KEY': JSON.stringify(process.env.VITE_OPENAI_API_KEY || '')
   },
   build: {
-    // Optimize bundle size
+    // Let Vite handle chunking automatically to avoid React loading issues
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          // Ensure React is always in the main bundle to avoid loading order issues
-          if (id.includes('node_modules')) {
-            // Keep React and React-DOM in the main bundle for proper loading order
-            if (id.includes('react') || id.includes('react-dom')) {
-              return undefined; // Keep in main bundle
-            }
-            if (id.includes('react-router')) {
-              return 'react-vendor';
-            }
-            if (id.includes('lucide-react') || id.includes('date-fns')) {
-              return 'ui-vendor';
-            }
-            if (id.includes('@supabase')) {
-              return 'supabase-vendor';
-            }
-            return 'vendor';
-          }
-          
-          // Feature chunks - be more specific to avoid conflicts
-          if (id.includes('src/pages/doctor/')) {
-            return 'doctor-pages';
-          }
-          if (id.includes('src/pages/patient/')) {
-            return 'patient-pages';
-          }
-          if (id.includes('src/components/')) {
-            return 'components';
-          }
-          
-          // Default chunk for other files
-          return undefined;
-        }
-      },
-      // Ensure proper external handling
-      external: [],
-      // Ensure proper chunk loading order
-      preserveEntrySignatures: 'strict'
+        // Disable manual chunking to prevent React loading order issues
+        manualChunks: undefined
+      }
     },
     // Enable source maps for debugging
     sourcemap: process.env.NODE_ENV === 'development',
